@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.4  (2026-10-13)
+ *  Version: 1.5  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -18,7 +18,7 @@
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.4' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '1.5' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },

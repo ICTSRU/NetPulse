@@ -1,5 +1,10 @@
 # Changelog — SRU NetPulse
 
+## v1.5 — 2026-10-13
+### Changed
+- `CONFIG.API_URL` updated to the new Web App deployment: `https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec` (replaces the v1.4 URL).
+- Version bumped to 1.5 in frontend and backend.
+
 ## v1.4 — 2026-10-13
 ### Changed
 - Backend Web App URL hard-coded in `CONFIG.API_URL`: `https://script.google.com/macros/s/AKfycbwNQJ7YyuuCc9grSfxDYrvz04e4-zOBKMKG3aa19pPc7fV8lEBXu473KOMp7X8hLVNIsQ/exec`.

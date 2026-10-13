@@ -78,6 +78,9 @@ main{flex:1;padding:20px;min-width:0}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1280px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:820px){.kpis{grid-template-columns:1fr}}
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px}
 .card h3{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:8px}
 .card h3 svg{color:var(--blue)}
@@ -162,6 +165,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .overlay.center{justify-content:center;align-items:center;padding:16px}
 .modal{background:#fff;border-radius:8px;width:min(440px,100%);padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .modal h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:var(--purple)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--purple);background:#fff;color:var(--purple);border-radius:var(--radius);padding:8px 12px;cursor:pointer;font-weight:700;font-family:inherit}
+.seg button.on{background:var(--purple);color:#fff}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:var(--radius);z-index:60;font-weight:600}
 
 /* ---------- sign-in ---------- */
@@ -270,12 +276,12 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v1.7
+ * SRU NetPulse — Frontend v1.9
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '1.7',
+  VERSION: '1.9',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
@@ -318,7 +324,9 @@ function toast(msg){ const t=document.createElement('div'); t.className='toast';
 function dur(ms){ if(!(ms>0)) return '—'; const m=Math.round(ms/60000); if(m<60) return m+' دقيقة'; const h=(m/60); return h<48? h.toFixed(1)+' ساعة' : (h/24).toFixed(1)+' يوم'; }
 function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
 function localInput(d=new Date()){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
-const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي فقط (@sr.edu.sa أو @srcolleges.org).',BAD_MOBILE:'رقم الجوال غير صحيح. استخدم الصيغة 05XXXXXXXX.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.'};
+const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي فقط (@sr.edu.sa أو @srcolleges.org).',BAD_MOBILE:'رقم الجوال غير صحيح. استخدم الصيغة 05XXXXXXXX.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.',BAD_ANSWER:'إجابة غير صالحة.'};
+const LOG_AR = {created:'إنشاء البلاغ',updated:'تحديث',confirmed:'أكّد المستخدم الحل',reopened:'أُعيد فتح البلاغ','auto-closed':'إغلاق تلقائي'};
+const FB_AR = {yes:['حُلّت ✓','c-ok'],no:['لم تُحل ✗','c-bad'],none:['بدون رد','c-grey']};
 
 /* ---------------- API (real or demo) ---------------- */
 async function api(action, payload={}){
@@ -410,9 +418,40 @@ function startApp(out){
 
 /* Deep link from e-mails: ?ticket=NP-1001 opens that ticket after sign-in */
 function openDeepLink(){
-  const go = id => { if (id && /^NP-\d+$/.test(id)) setTimeout(()=>openTicket(id), 300); };
-  if (HOSTED && google.script.url) google.script.url.getLocation(loc => go(loc.parameter && loc.parameter.ticket));
-  else { try { go(new URLSearchParams(location.search).get('ticket')); } catch(e){} }
+  const go = (id, fb) => {
+    if (!id || !/^NP-\d+$/.test(id)) return;
+    setTimeout(()=> (fb==='yes'||fb==='no') ? askFeedback(id, fb) : openTicket(id), 300);
+  };
+  if (HOSTED && google.script.url) google.script.url.getLocation(loc => { if (loc.hash && !loc.parameter.ticket) location.hash = loc.hash; go(loc.parameter && loc.parameter.ticket, loc.parameter && loc.parameter.fb); });
+  else { try { const q=new URLSearchParams(location.search); go(q.get('ticket'), q.get('fb')); } catch(e){} }
+}
+
+/* «هل حُلّت مشكلتك؟» — from the e-mail buttons or the ticket panel */
+function askFeedback(id, answer){
+  if (answer === 'yes') return sendFeedback(id, 'yes', '');
+  const ov=document.createElement('div'); ov.className='overlay center'; ov.id='fbOv';
+  ov.innerHTML=`<form class="modal" onsubmit="event.preventDefault();sendFeedback('${esc(id)}','no',$('#fbn').value)">
+    <h3 style="color:var(--bad)"><i data-lucide="rotate-ccw"></i>المشكلة لم تُحل</h3>
+    <p class="hint">سيُعاد فتح البلاغ <b class="en">${esc(id)}</b> تلقائيًا بأولوية أعلى ويُبلَّغ الفريق الفني فورًا.</p>
+    <div class="field"><label class="f" for="fbn">ما الذي ما زال لا يعمل؟ (اختياري)</label><textarea id="fbn" maxlength="500" style="min-height:80px" placeholder="مثال: البطء ما زال موجودًا في القاعة 214 بعد الظهر"></textarea></div>
+    <div class="row"><button class="btn" style="flex:1;background:var(--bad);border-color:var(--bad)"><i data-lucide="rotate-ccw"></i>إعادة فتح البلاغ</button>
+    <button type="button" class="btn sec" onclick="this.closest('.overlay').remove();sendFeedback('${esc(id)}','yes','')">بل حُلّت ✓</button></div></form>`;
+  document.body.appendChild(ov); icons();
+}
+async function sendFeedback(id, answer, note){
+  const old=document.getElementById('fbOv'); if(old) old.remove();
+  try {
+    const o = await api('feedback',{data:{ticketId:id,answer,note}});
+    const ov=document.createElement('div'); ov.className='overlay center'; ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+    const msg = o.already
+      ? `<h3><i data-lucide="info"></i>تم تسجيل ردك سابقًا</h3><p class="hint">حالة البلاغ <b class="en">${esc(id)}</b> الآن: ${chip(T_STATUS,o.status)}</p>`
+      : answer==='yes'
+        ? `<h3 style="color:var(--ok)"><i data-lucide="check-circle-2"></i>شكرًا لتأكيدك</h3><p class="hint">سعدنا بحل مشكلتك. تم إغلاق البلاغ <b class="en">${esc(id)}</b>.</p>`
+        : `<h3 style="color:var(--bad)"><i data-lucide="rotate-ccw"></i>أُعيد فتح البلاغ</h3><p class="hint">نعتذر عن استمرار المشكلة. أُعيد فتح البلاغ <b class="en">${esc(id)}</b> وأُبلغ الفريق الفني، وستصلك رسالة عند أي تحديث.</p>`;
+    ov.innerHTML=`<div class="modal">${msg}<div class="row" style="margin-top:12px"><button class="btn" style="flex:1" onclick="this.closest('.overlay').remove();openTicket('${esc(id)}')">عرض البلاغ</button><button class="btn sec" onclick="this.closest('.overlay').remove()">إغلاق</button></div></div>`;
+    document.body.appendChild(ov); icons();
+    S.tickets = (await api('myTickets')).tickets; if (['home','track'].includes(S.view)) route();
+  } catch(e){ toast(e.message); }
 }
 
 /* ---------------- Profile (mobile number) ---------------- */
@@ -444,6 +483,10 @@ function tick(){ $('#clock').textContent = new Date().toLocaleString(LOC,{weekda
 async function loadDepartments(){
   try { const r = await fetch(CONFIG.DEPARTMENTS_URL,{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.groups)&&j.groups.length) DEPARTMENTS=j.groups; } } catch(e){ /* fallback to embedded copy */ }
 }
+
+/* Surface unexpected errors instead of failing silently */
+window.addEventListener('error', e => { try { toast('خطأ: ' + (e.message||'غير معروف')); } catch(_){} });
+window.addEventListener('unhandledrejection', e => { try { toast('خطأ: ' + ((e.reason&&e.reason.message)||e.reason||'غير معروف')); } catch(_){} });
 
 /* ---------------- Router ---------------- */
 window.addEventListener('hashchange', route);
@@ -677,8 +720,8 @@ async function vTrack(){
   icons();
 }
 function ticketTable(list, staff){
-  return `<div class="tablewrap"><table><thead><tr><th>رقم البلاغ</th>${staff?'<th>المُبلِّغ</th>':''}<th>المبنى</th><th>نوع المشكلة</th>${staff?'<th>الأولوية</th><th>المسؤول</th>':''}<th>الحالة</th><th>وقت البلاغ</th></tr></thead><tbody>
-  ${list.map(t=>`<tr class="click" onclick="openTicket('${esc(t.id)}')"><td><b class="en">${esc(t.id)}</b></td>${staff?`<td>${esc(t.name)}</td>`:''}<td>${esc(t.building)}${t.spot?`<div class="hint">${esc(t.spot)}</div>`:''}</td><td>${esc(t.issueType)}</td>${staff?`<td>${chip(PRIO,t.priority)}</td><td>${esc(t.assignee||'—')}</td>`:''}<td>${chip(T_STATUS,t.status)}</td><td>${fmtShort(t.createdAt)}</td></tr>`).join('')}
+  return `<div class="tablewrap"><table><thead><tr><th>رقم البلاغ</th>${staff?'<th>المُبلِّغ</th>':''}<th>المبنى</th><th>نوع المشكلة</th>${staff?'<th>الأولوية</th><th>المسؤول</th>':''}<th>الحالة</th><th>وقت البلاغ</th><th class="no-print"></th></tr></thead><tbody>
+  ${list.map(t=>`<tr class="click" onclick="openTicket('${esc(t.id)}')"><td><b class="en">${esc(t.id)}</b></td>${staff?`<td>${esc(t.name)}</td>`:''}<td>${esc(t.building)}${t.spot?`<div class="hint">${esc(t.spot)}</div>`:''}</td><td>${esc(t.issueType)}</td>${staff?`<td>${chip(PRIO,t.priority)}</td><td>${esc(t.assignee||'—')}</td>`:''}<td>${chip(T_STATUS,t.status)}</td><td>${fmtShort(t.createdAt)}</td><td class="no-print"><button class="btn sm ${staff?'':'sec'}" onclick="event.stopPropagation();openTicket('${esc(t.id)}')"><i data-lucide="${staff?'wrench':'eye'}"></i>${staff?'معالجة':'عرض'}</button></td></tr>`).join('')}
   </tbody></table></div>`;
 }
 async function openTicket(id){
@@ -706,30 +749,48 @@ async function openTicket(id){
         ${t.assignee?`<span>المسؤول</span><div>${esc(t.assignee)}</div>`:''}
         ${t.resolution?`<span>الحل</span><div>${esc(t.resolution)}</div>`:''}
       </div>
+      ${t.status==='resolved' && t.email===S.user.email ? `<div class="card" style="background:var(--ok-bg);border-color:#bfe5cf;text-align:center;margin-bottom:12px">
+          <h3 style="justify-content:center"><i data-lucide="message-circle-question"></i>هل حُلّت مشكلتك؟</h3>
+          <div class="row" style="justify-content:center;margin-top:8px"><button class="btn" style="background:var(--ok);border-color:var(--ok)" onclick="this.closest('.overlay').remove();askFeedback('${esc(t.id)}','yes')">✓ نعم، حُلّت</button>
+          <button class="btn" style="background:var(--bad);border-color:var(--bad)" onclick="this.closest('.overlay').remove();askFeedback('${esc(t.id)}','no')">✗ لا، ما زالت</button></div></div>` : ''}
+      ${staff && (t.feedback || t.reopenCount) ? `<div class="kv"><span>رد المستخدم</span><div>${t.feedback?chip(FB_AR,t.feedback):'—'} ${t.reopenCount?`<span class="chip c-warn">أُعيد فتحه ${t.reopenCount}×</span>`:''}</div></div>` : ''}
       ${staff?updateForm(t):''}
       <h4 style="margin:16px 0 10px">سجل المعالجة</h4>
-      <ul class="timeline">${log.map(l=>`<li><b>${l.action==='created'?'إنشاء البلاغ':'تحديث'} — ${chip(T_STATUS,l.status)}</b><br><small>${fmtDT(l.at)} · ${esc(l.by)}</small>${l.note?`<div>${esc(l.note)}</div>`:''}</li>`).join('')}</ul>`;
+      <ul class="timeline">${log.map(l=>`<li><b>${esc(LOG_AR[l.action]||l.action)} — ${chip(T_STATUS,l.status)}</b><br><small>${fmtDT(l.at)} · ${esc(l.by)}</small>${l.note?`<div>${esc(l.note)}</div>`:''}</li>`).join('')}</ul>`;
     icons();
   } catch(e){ ov.querySelector('.drawer').innerHTML=`<div class="alert c-bad">${esc(e.message)}</div>`; }
 }
 function updateForm(t){
+  const qs = [['review','استلام البلاغ','inbox'],['progress','بدء المعالجة','play'],['resolved','تم الحل','check-circle-2'],['closed','إغلاق','archive']];
   return `<form class="card" style="background:var(--purple-light)" onsubmit="saveTicket(event,'${esc(t.id)}')">
-    <h3><i data-lucide="wrench"></i>تحديث البلاغ</h3>
-    <div class="grid g2">
-      <div class="field"><label class="f">الحالة</label><select id="us">${Object.keys(T_STATUS).map(k=>`<option value="${k}" ${k===t.status?'selected':''}>${T_STATUS[k][0]}</option>`).join('')}</select></div>
-      <div class="field"><label class="f">الأولوية</label><select id="up">${Object.keys(PRIO).map(k=>`<option value="${k}" ${k===t.priority?'selected':''}>${PRIO[k][0]}</option>`).join('')}</select></div>
+    <h3><i data-lucide="wrench"></i>معالجة البلاغ</h3>
+    <label class="f">تغيير الحالة</label>
+    <div class="seg" id="seg">${qs.map(q=>`<button type="button" class="${q[0]===t.status?'on':''}" data-st="${q[0]}" onclick="pickStatus('${q[0]}')"><i data-lucide="${q[2]}"></i>${q[1]}</button>`).join('')}
+      <button type="button" class="${t.status==='open'?'on':''}" data-st="open" onclick="pickStatus('open')"><i data-lucide="rotate-ccw"></i>مفتوح</button></div>
+    <input type="hidden" id="us" value="${esc(t.status)}">
+    <div class="grid g2" style="margin-top:12px">
+      <div class="field"><label class="f" for="up">الأولوية</label><select id="up">${Object.keys(PRIO).map(k=>`<option value="${k}" ${k===t.priority?'selected':''}>${PRIO[k][0]}</option>`).join('')}</select></div>
+      <div class="field"><label class="f" for="ua">المسؤول</label><div class="row" style="flex-wrap:nowrap"><input type="text" id="ua" value="${esc(t.assignee||'')}" placeholder="اسم الفني المسؤول"><button type="button" class="btn sec sm" onclick="$('#ua').value=S.user.name">تعيين لي</button></div></div>
     </div>
-    <div class="field"><label class="f">المسؤول</label><input type="text" id="ua" value="${esc(t.assignee||'')}" placeholder="اسم الفني المسؤول"></div>
-    <div class="field"><label class="f">ملاحظة للمُبلِّغ</label><textarea id="un" maxlength="500" style="min-height:60px" placeholder="تظهر في سجل المعالجة وتُرسل بالبريد عند تغيير الحالة"></textarea></div>
-    <div class="field"><label class="f">الإجراء المتخذ / الحل</label><textarea id="ur" maxlength="500" style="min-height:60px">${esc(t.resolution||'')}</textarea></div>
-    <button class="btn block"><i data-lucide="save"></i>حفظ التحديث</button></form>`;
+    <div class="field"><label class="f" for="un">الرد على المُبلِّغ <span class="hint">(يُرسل له بالبريد ويظهر في سجل المعالجة)</span></label><textarea id="un" maxlength="500" style="min-height:70px" placeholder="مثال: تم رصد المشكلة وجارٍ العمل عليها، نتوقع الحل خلال ساعتين."></textarea></div>
+    <div class="field" id="resWrap"><label class="f" for="ur">الإجراء المتخذ / الحل <span id="resReq" class="hint"></span></label><textarea id="ur" maxlength="500" style="min-height:60px">${esc(t.resolution||'')}</textarea></div>
+    <div class="hint" id="saveHint" style="margin-bottom:8px"></div>
+    <button class="btn block" id="saveBtn"><i data-lucide="save"></i>حفظ وإرسال</button></form>`;
+}
+function pickStatus(st){
+  $('#us').value = st;
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on', b.dataset.st===st));
+  $('#resReq').textContent = st==='resolved' ? '— مطلوب عند الحل، ويُرسل للمُبلِّغ مع سؤال «هل حُلّت مشكلتك؟»' : '';
+  $('#saveHint').textContent = st==='resolved' ? 'سيصل المُبلِّغ بريد «تم الحل» بزرّي نعم / لا.' : '';
 }
 async function saveTicket(ev,id){
   ev.preventDefault();
+  if ($('#us').value==='resolved' && !$('#ur').value.trim()) { toast('اكتب الإجراء المتخذ قبل تحويل البلاغ إلى «تم الحل».'); $('#ur').focus(); return; }
+  const btn=$('#saveBtn'); btn.disabled=true; btn.textContent='جارٍ الحفظ…';
   try {
     await api('updateTicket',{data:{ticketId:id,status:$('#us').value,priority:$('#up').value,assignee:$('#ua').value,note:$('#un').value,resolution:$('#ur').value}});
-    toast('تم حفظ التحديث'); document.querySelector('.overlay').remove(); S.team=null; route();
-  } catch(e){ toast(e.message); }
+    toast('تم حفظ التحديث' + ($('#un').value.trim()?' وإرسال الرد للمُبلِّغ':'')); document.querySelector('.overlay').remove(); S.team=null; route();
+  } catch(e){ toast(e.message); btn.disabled=false; btn.innerHTML='<i data-lucide="save"></i>حفظ وإرسال'; icons(); }
 }
 
 /* ----- Network status view ----- */
@@ -754,8 +815,17 @@ async function vTeam(){
   const resolveT = T.filter(t=>t.resolvedAt && now-new Date(t.createdAt)<30*864e5).map(t=>new Date(t.resolvedAt)-new Date(t.createdAt));
   const alerts = d.buildings.filter(b=>['warn','slow','down'].includes(b.status));
   const tests7 = d.tests.filter(t=>now-new Date(t.at)<7*864e5);
+  const fb30 = (d.feedback||[]).filter(f=>now-new Date(f.at)<30*864e5);
+  const fbYes = fb30.filter(f=>f.answer==='yes').length, fbNo = fb30.filter(f=>f.answer==='no').length;
+  const sat = fbYes+fbNo ? Math.round(fbYes*100/(fbYes+fbNo)) : null;
+  const askedN = fbYes + fbNo + T.filter(t=>(t.feedback==='none' || (t.status==='resolved' && !t.feedback)) && now-new Date(t.updatedAt)<30*864e5).length;
+  const respRate = askedN ? Math.round((fbYes+fbNo)*100/askedN) : null;
+  const reopened = T.filter(t=>t.reopenCount>0 && now-new Date(t.updatedAt)<30*864e5).length;
+  const satColor = sat===null?['var(--grey-bg)','var(--grey)']: sat>=85?['var(--ok-bg)','var(--ok)']: sat>=70?['var(--warn-bg)','var(--warn)']:['var(--bad-bg)','var(--bad)'];
+  const lastNo = (d.feedback||[]).filter(f=>f.answer==='no').slice(-5).reverse();
   $('#main').innerHTML = `${head('bar-chart-3','لوحة متابعة الفريق الفني','مراقبة البلاغات وحالة الشبكة في جميع مباني الجامعة.')}
-  <div class="grid g4">
+  <div class="grid kpis">
+    ${kpi('smile',satColor[0],satColor[1],'نسبة الرضا (30 يومًا)',sat===null?'—':sat+'%',`${fbYes+fbNo} رد · الاستجابة ${respRate===null?'—':respRate+'%'} · أُعيد فتح ${reopened}`)}
     ${kpi('file-text','var(--warn-bg)','var(--warn)','البلاغات المفتوحة',openL.length,`من إجمالي ${month.length} بلاغ هذا الشهر`)}
     ${kpi('clock','var(--ok-bg)','var(--ok)','متوسط زمن الاستجابة',dur(resp.reduce((a,b)=>a+b,0)/(resp.length||1)),'أول استجابة — آخر 7 أيام')}
     ${kpi('check-circle-2','var(--blue-light)','var(--blue)','متوسط زمن الحل',dur(resolveT.reduce((a,b)=>a+b,0)/(resolveT.length||1)),'آخر 30 يومًا')}
@@ -768,6 +838,9 @@ async function vTeam(){
   <div class="grid g2" style="margin-top:16px">
     <div class="card"><div class="row"><h3><i data-lucide="list"></i>أحدث البلاغات</h3><span class="spacer"></span><a href="#tickets">عرض الكل</a></div>${T.length?ticketTable(T.slice(0,6),true):'<div class="empty">لا توجد بلاغات</div>'}</div>
     <div class="card"><h3><i data-lucide="gauge"></i>متوسط سرعة التحميل حسب المبنى (7 أيام)</h3><p class="sub">${tests7.length} قياس من المستخدمين</p><div style="height:250px"><canvas id="cspeed"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3><i data-lucide="message-square-warning"></i>آخر بلاغات أفاد أصحابها بعدم الحل</h3>
+    ${lastNo.length?`<div class="tablewrap"><table><thead><tr><th>رقم البلاغ</th><th>المبنى</th><th>نوع المشكلة</th><th>تعليق المستخدم</th><th>الوقت</th></tr></thead><tbody>${lastNo.map(f=>`<tr class="click" onclick="openTicket('${esc(f.ticketId)}')"><td><b class="en">${esc(f.ticketId)}</b></td><td>${esc(f.building)}</td><td>${esc(f.issueType)}</td><td>${esc(f.note||'—')}</td><td>${fmtShort(f.at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><i data-lucide="smile"></i>لا توجد بلاغات أُعيد فتحها</div>'}
   </div>
   <div class="card" style="margin-top:16px"><div class="row"><h3><i data-lucide="map-pin"></i>حالة الشبكة في مباني الجامعة</h3><span class="spacer"></span><a href="#netadmin">تحديث الحالة</a></div><div class="grid g4" style="margin-top:10px">${d.buildings.map(b=>`<div class="bcard s-${b.status}"><div class="row"><b>${esc(b.building)}</b><span class="spacer"></span>${chip(N_STATUS,b.status)}</div><div class="hint">${esc(SOURCE_AR[b.source]||'')}</div><div class="hint">مفتوحة: ${b.openTickets} · وسيط <span class="en">${b.medianDown||'—'} Mbps</span></div></div>`).join('')}</div></div>`;
   icons();
@@ -808,7 +881,7 @@ function currentFiltered(){
 }
 function filterTickets(){ const l=currentFiltered(); $('#tbl').innerHTML = l.length? ticketTable(l,true) : '<div class="empty"><i data-lucide="inbox"></i>لا توجد نتائج</div>'; icons(); }
 function exportCSV(){
-  const cols=['id','createdAt','name','email','mobile','department','building','spot','issueType','connection','status','priority','assignee','firstResponseAt','resolvedAt','description','resolution'];
+  const cols=['id','createdAt','name','email','mobile','department','building','spot','issueType','connection','status','priority','assignee','firstResponseAt','resolvedAt','feedback','reopenCount','description','resolution'];
   const rows=[cols.join(',')].concat(currentFiltered().map(t=>cols.map(c=>'"'+String(t[c]??'').replace(/"/g,'""')+'"').join(',')));
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+rows.join('\n')],{type:'text/csv'})); a.download='netpulse-tickets-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
 }
@@ -838,9 +911,11 @@ function vNetAdmin(){
   ]
 }</pre>
       <p class="hint">القيم المسموحة للحالة: <span class="en">ok · warn · slow · down · maintenance</span></p></div>
-  </div>`;
+  </div>
+  ${S.user.role==='admin'?`<div class="card" style="margin-top:16px"><div class="row"><div><h3><i data-lucide="file-bar-chart"></i>التقرير الأسبوعي</h3><p class="sub" style="margin:0">يُرسل تلقائيًا كل أحد الساعة 7 صباحًا، ويُحفظ في تبويب WeeklyKPIs.</p></div><span class="spacer"></span><button class="btn" onclick="sendReportNow(this)"><i data-lucide="send"></i>إرسال التقرير الآن</button></div></div>`:''}`;
   icons();
 }
+async function sendReportNow(b){ b.disabled=true; try{ const o=await api('sendWeeklyReport'); toast('أُرسل التقرير إلى '+o.sentTo); }catch(e){ toast(e.message); } b.disabled=false; }
 async function saveNet(ev){ ev.preventDefault(); try{ const o=await api('setBuildingStatus',{data:{building:$('#nb').value,status:$('#ns').value,note:$('#nn').value}}); S.buildings=o.buildings; toast('تم نشر الحالة'); ev.target.reset(); }catch(e){ toast(e.message); } }
 
 /* =============================================================
@@ -858,7 +933,7 @@ function demoDB(){
   db={v:CONFIG.VERSION,tickets,log:tickets.map(t=>({at:t.createdAt,ticketId:t.id,action:'created',status:'open',note:'',by:t.email})),
     tests:Array.from({length:60},(_,i)=>({at:new Date(now-i*2.5*h).toISOString(),building:L[i%L.length],down:+(8+Math.random()*60).toFixed(1),up:+(4+Math.random()*25).toFixed(1),ping:Math.round(15+Math.random()*50)})),
     stat:{'مبنى كلية الطب':{status:'slow',source:'monitoring',note:'استخدام الوصلة الرئيسية 92%',updatedAt:new Date(now-0.4*h).toISOString()},'مبنى كلية الأعمال':{status:'warn',source:'manual',note:'متابعة ضعف الإشارة في الدور الثاني',updatedAt:new Date(now-h).toISOString()}},
-    L, seq:1043};
+    L, seq:1043, feedback: tickets.filter((t,i)=>t.status==='resolved'&&i%3===0).map((t,i)=>({at:t.resolvedAt||t.updatedAt,ticketId:t.id,answer:i%4===1?'no':'yes',note:i%4===1?'ما زال البطء موجودًا بعد الظهر':'',building:t.building,issueType:t.issueType}))};
   demoSave(db); return db;
 }
 function demoNorm(v){ let s=String(v).replace(/[\s\-().]/g,'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)); if(/^00/.test(s)) s='+'+s.slice(2); const m=s.match(/^(?:\+?966|0)?(5\d{8})$/); return m?'+966'+m[1]:s; }
@@ -891,7 +966,14 @@ async function demoApi(action,p){
       db.log.push({at:now,ticketId:id,action:'created',status:'open',note:'',by:u.email}); demoSave(db); return {ok:true,ticketId:id}; }
     case 'myTickets': return {ok:true,tickets:mine()};
     case 'getTicket': { const t=db.tickets.find(x=>x.id===p.ticketId); if(!t) throw new Error(ERR_AR.NOT_FOUND); return {ok:true,ticket:t,log:db.log.filter(l=>l.ticketId===t.id)}; }
-    case 'teamData': return {ok:true,tickets:db.tickets,tests:db.tests,buildings:demoStatus(db)};
+    case 'sendWeeklyReport': return {ok:true,sentTo:'m.elmahdy@sr.edu.sa'};
+    case 'teamData': return {ok:true,tickets:db.tickets,tests:db.tests,feedback:db.feedback||[],buildings:demoStatus(db)};
+    case 'feedback': { const d=p.data, t=db.tickets.find(x=>x.id===d.ticketId), now=new Date().toISOString(); if(!t) throw new Error(ERR_AR.NOT_FOUND);
+      if(t.status!=='resolved') return {ok:true,already:true,status:t.status};
+      t.feedback=d.answer; t.feedbackAt=now; t.updatedAt=now;
+      if(d.answer==='yes') t.status='closed'; else { t.status='open'; t.resolvedAt=''; t.reopenCount=(t.reopenCount||0)+1; t.priority='high'; }
+      (db.feedback=db.feedback||[]).push({at:now,ticketId:t.id,answer:d.answer,note:d.note,building:t.building,issueType:t.issueType});
+      db.log.push({at:now,ticketId:t.id,action:d.answer==='yes'?'confirmed':'reopened',status:t.status,note:d.note||'',by:u.email}); demoSave(db); return {ok:true,status:t.status,feedback:d.answer}; }
     case 'updateTicket': { const d=p.data, t=db.tickets.find(x=>x.id===d.ticketId), now=new Date().toISOString();
       Object.assign(t,{status:d.status,priority:d.priority,assignee:d.assignee,resolution:d.resolution,updatedAt:now});
       if(!t.firstResponseAt&&d.status!=='open') t.firstResponseAt=now; if(['resolved','closed'].includes(d.status)&&!t.resolvedAt) t.resolvedAt=now;

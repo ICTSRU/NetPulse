@@ -1,5 +1,28 @@
 # Changelog — SRU NetPulse
 
+## v1.9 — 2026-10-13
+### Added
+- **Weekly KPI report** (`sendWeeklyReport`, trigger every Sunday 07:00 Riyadh, installed by `setup`) to `REPORT_EMAILS` (default m.elmahdy@sr.edu.sa): new/resolved/open/auto-closed tiles with week-over-week change; KPI table vs targets (satisfaction, first response, resolution time, reopen %, survey response rate) marked محقق / غير محقق; top buildings with bars; issue-type mix; reopened tickets; user speed-test median; CSV of the week's tickets attached.
+- `WeeklyKPIs` tab — one row per week, a cumulative evidence log for the operational plan.
+- KPI targets configurable via Script properties `TARGET_SAT`, `TARGET_RESPONSE_MIN`, `TARGET_RESOLVE_HOURS`, `TARGET_REOPEN_PCT`.
+- Admin button «إرسال التقرير الآن» (تحديث حالة الشبكة page).
+### Changed
+- **Ticket management made explicit:** «معالجة» button on every row; panel redesigned with one-click status buttons (استلام البلاغ / بدء المعالجة / تم الحل / إغلاق / مفتوح), «تعيين لي», and a **«الرد على المُبلِّغ»** field that is e-mailed even when the status does not change (new «رد من الفريق الفني» e-mail).
+- «تم الحل» now requires the action taken (sent to the reporter with the Yes/No question).
+- Unexpected errors are shown as a message instead of failing silently.
+
+## v1.8 — 2026-10-13
+### Added
+- **«هل حُلّت مشكلتك؟»** — the «تم الحل» e-mail now carries two buttons (✓ نعم، حُلّت / ✗ لا، ما زالت المشكلة); the same question appears in the ticket panel.
+  - **Yes** → ticket closed, answer recorded.
+  - **No** → optional comment, ticket **reopened automatically** (status مفتوح, priority raised to at least «عالية», reopen counter +1) and the NOC receives a «أُعيد فتح البلاغ» e-mail.
+- **Auto-close:** daily trigger `autoCloseResolved` (installed by `setup`) closes tickets left «تم الحل» with no answer after `AUTOCLOSE_DAYS` (default 3).
+- **Satisfaction KPI** on the tech dashboard: satisfaction % (yes ÷ answers, 30 days, colour-coded ≥85% green / ≥70% amber / below red), response rate and reopened count; plus a table of the latest «لم تُحل» answers with user comments.
+- New `Feedback` tab (Timestamp, TicketId, Email, Answer, Note, Building, IssueType, Cycle) and `Tickets` columns `Feedback`, `FeedbackAt`, `ReopenCount` — added automatically to the existing Sheet.
+- Timeline labels for confirmed / reopened / auto-closed events; feedback and reopen count shown to staff and exported to CSV.
+### Changed
+- Manifest: added scopes for the auto-close trigger and the signed-in user's e-mail; web-app access set to `DOMAIN`.
+
 ## v1.7 — 2026-10-13
 ### Changed
 - **Redesigned e-mails** (reporter confirmation, status update, resolved, NOC alert): branded header with the «نبض الشبكة» logo, progress tracker (مفتوح → قيد المراجعة → قيد المعالجة → تم الحل), coloured status badge, details table, call-to-action button and ITOC footer. Table-based layout for Outlook/Gmail; sender name «نبض الشبكة — SRU NetPulse»; no-reply.

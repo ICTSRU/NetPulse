@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.7  (2026-10-13)
+ *  Version: 1.9  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -19,6 +19,10 @@
  *    NOTIFY_EMAIL    (optional) NOC/helpdesk mailbox notified on every new ticket
  *    MONITOR_KEY     (optional) shared secret for the monitoring push endpoint
  *    STALE_HOURS     (optional) hours before a monitoring status is considered stale (default 6)
+ *    AUTOCLOSE_DAYS  (optional) days after «تم الحل» with no reply before auto-close (default 3)
+ *    REPORT_EMAILS   (optional) weekly report recipients, comma-separated (default m.elmahdy@sr.edu.sa)
+ *    TARGET_SAT / TARGET_RESPONSE_MIN / TARGET_RESOLVE_HOURS / TARGET_REOPEN_PCT  (optional) KPI targets
+ *                    defaults: 85 (%) / 60 (min) / 24 (h) / 10 (%)
  *    SEND_EMAILS     (optional) "false" to disable all e-mails (default true)
  *    APP_URL         (optional) link used in e-mails; default = this Web App's /exec URL
  *
@@ -26,7 +30,7 @@
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.7' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '1.9' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -34,8 +38,10 @@ const SHEETS = {
   LOCS:     { name: 'Locations',     headers: ['Building', 'College', 'Active', 'SortOrder'] },
   NETSTAT:  { name: 'NetworkStatus', headers: ['Building', 'Status', 'Source', 'Note', 'UpdatedAt', 'UpdatedBy'] },
   TESTS:    { name: 'SpeedTests',    headers: ['Timestamp', 'Email', 'Building', 'DownloadMbps', 'UploadMbps', 'PingMs', 'JitterMs', 'Connection', 'Server', 'Client'] },
-  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile'] },
-  LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] }
+  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount'] },
+  LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] },
+  FEEDBACK: { name: 'Feedback',      headers: ['Timestamp', 'TicketId', 'Email', 'Answer', 'Note', 'Building', 'IssueType', 'Cycle'] },
+  WEEKLY:   { name: 'WeeklyKPIs',    headers: ['WeekStart', 'WeekEnd', 'NewTickets', 'Resolved', 'OpenAtEnd', 'SatisfactionPct', 'ResponseRatePct', 'Answers', 'AvgFirstResponseMin', 'AvgResolveHours', 'Reopened', 'ReopenPct', 'AutoClosed', 'TopBuilding', 'TopIssue', 'SpeedTests', 'MedianDownMbps', 'SentTo', 'SentAt'] }
 };
 
 const TICKET_STATUS = ['open', 'review', 'progress', 'resolved', 'closed'];
@@ -104,6 +110,8 @@ function route_(action, user, body) {
       case 'getTicket':      return getTicket_(user, body.ticketId);
       case 'teamData':       requireRole_(user, ['tech', 'admin']); return teamData_();
       case 'updateTicket':   requireRole_(user, ['tech', 'admin']); return updateTicket_(user, body.data || {});
+      case 'feedback':       return feedback_(user, body.data || {});
+      case 'sendWeeklyReport': requireRole_(user, ['admin']); return { ok: true, sentTo: sendWeeklyReport() };
       case 'setBuildingStatus': requireRole_(user, ['tech', 'admin']); return setBuildingStatus_(user, body.data || {});
       default: return { ok: false, error: 'UNKNOWN_ACTION' };
     }
@@ -297,7 +305,10 @@ function teamData_() {
   const tests = readAll_(SHEETS.TESTS)
     .filter(r => r.Timestamp && new Date(r.Timestamp).getTime() >= testsSince)
     .map(r => ({ at: iso_(r.Timestamp), building: r.Building, down: Number(r.DownloadMbps) || 0, up: Number(r.UploadMbps) || 0, ping: Number(r.PingMs) || 0 }));
-  return { ok: true, tickets: tickets, tests: tests, buildings: buildingStatus_() };
+  const feedback = readAll_(SHEETS.FEEDBACK)
+    .filter(r => r.Timestamp && new Date(r.Timestamp).getTime() >= since)
+    .map(r => ({ at: iso_(r.Timestamp), ticketId: r.TicketId, answer: r.Answer, note: r.Note, building: r.Building, issueType: r.IssueType }));
+  return { ok: true, tickets: tickets, tests: tests, feedback: feedback, buildings: buildingStatus_() };
 }
 
 function updateTicket_(user, d) {
@@ -319,6 +330,7 @@ function updateTicket_(user, d) {
   if (d.resolution !== undefined) row[c('Resolution')] = clean_(d.resolution, 500);
   if (!row[c('FirstResponseAt')] && d.status && d.status !== 'open') row[c('FirstResponseAt')] = now;
   if ((d.status === 'resolved' || d.status === 'closed') && !row[c('ResolvedAt')]) row[c('ResolvedAt')] = now;
+  if (d.status === 'resolved' && prevStatus !== 'resolved') { row[c('Feedback')] = ''; row[c('FeedbackAt')] = ''; }
   row[c('UpdatedAt')] = now;
   sh.getRange(rowIdx + 1, 1, 1, row.length).setValues([row]);
 
@@ -327,8 +339,70 @@ function updateTicket_(user, d) {
 
   if (d.status && d.status !== prevStatus) {
     notifyReporter_(row[c('Email')], d.ticketId, row[c('Status')], note || row[c('Resolution')]);
+  } else if (note) {
+    notifyReply_(row[c('Email')], d.ticketId, row[c('Status')], note);   // reply only, status unchanged
   }
-  return { ok: true };
+  return { ok: true, status: row[c('Status')] };
+}
+
+/**
+ * «هل حُلّت مشكلتك؟» — answer from the reporter (e-mail buttons or ticket panel).
+ *  yes → ticket closed;  no → ticket reopened (status open, priority raised, NOC alerted).
+ */
+function feedback_(user, d) {
+  const answer = d.answer === 'yes' ? 'yes' : d.answer === 'no' ? 'no' : '';
+  if (!answer) throw new Error('BAD_ANSWER');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = sheet_(SHEETS.TICKETS);
+    const data = sh.getDataRange().getValues(); const H = data[0]; const c = n => H.indexOf(n);
+    const i = data.findIndex((r, k) => k > 0 && r[c('TicketId')] === d.ticketId);
+    if (i < 1) throw new Error('NOT_FOUND');
+    const row = data[i];
+    if (String(row[c('Email')]).toLowerCase() !== user.email) throw new Error('FORBIDDEN');
+    if (row[c('Status')] !== 'resolved') {
+      return { ok: true, already: true, status: row[c('Status')], feedback: row[c('Feedback')] || '' };
+    }
+    const now = new Date(); const note = clean_(d.note, 500);
+    const cycle = (Number(row[c('ReopenCount')]) || 0) + 1;
+    row[c('Feedback')] = answer; row[c('FeedbackAt')] = now; row[c('UpdatedAt')] = now;
+    if (answer === 'yes') {
+      row[c('Status')] = 'closed';
+    } else {
+      row[c('Status')] = 'open';
+      row[c('ResolvedAt')] = '';
+      row[c('ReopenCount')] = cycle;
+      const order = ['low', 'medium', 'high', 'critical'];
+      row[c('Priority')] = order[Math.min(3, Math.max(2, order.indexOf(row[c('Priority')]) + 1))];
+    }
+    sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
+    appendRow_(SHEETS.FEEDBACK, { Timestamp: now, TicketId: d.ticketId, Email: user.email, Answer: answer, Note: note,
+      Building: row[c('Building')], IssueType: row[c('IssueType')], Cycle: cycle });
+    appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: d.ticketId, Action: answer === 'yes' ? 'confirmed' : 'reopened',
+      Status: row[c('Status')], Note: note || (answer === 'yes' ? 'أكّد المستخدم حل المشكلة' : 'أفاد المستخدم بأن المشكلة لم تُحل'), By: user.email });
+    if (answer === 'no') notifyReopen_(d.ticketId, user, row[c('Building')], row[c('IssueType')], note, row[c('Assignee')]);
+    return { ok: true, status: row[c('Status')], feedback: answer };
+  } finally { lock.releaseLock(); }
+}
+
+/** Daily trigger: close tickets left «تم الحل» with no answer for AUTOCLOSE_DAYS. */
+function autoCloseResolved() {
+  const days = Number(prop_('AUTOCLOSE_DAYS')) || 3;
+  const limit = Date.now() - days * 86400000;
+  const sh = sheet_(SHEETS.TICKETS);
+  const data = sh.getDataRange().getValues(); const H = data[0]; const c = n => H.indexOf(n);
+  const now = new Date(); let n = 0;
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (r[c('Status')] === 'resolved' && !r[c('Feedback')] && r[c('ResolvedAt')] && new Date(r[c('ResolvedAt')]).getTime() < limit) {
+      r[c('Status')] = 'closed'; r[c('Feedback')] = 'none'; r[c('UpdatedAt')] = now;
+      sh.getRange(i + 1, 1, 1, r.length).setValues([r]);
+      appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: r[c('TicketId')], Action: 'auto-closed', Status: 'closed',
+        Note: 'أُغلق تلقائيًا لعدم الرد خلال ' + days + ' أيام', By: 'system' });
+      n++;
+    }
+  }
+  return n;
 }
 
 function setBuildingStatus_(user, d) {
@@ -474,7 +548,8 @@ function notifyNewTicket_(id, user, d, desc) {
 }
 
 function notifyReporter_(email, id, status, note) {
-  const done = status === 'resolved' || status === 'closed';
+  if (status === 'resolved') return notifyResolved_(email, id, note);
+  const done = status === 'closed';
   sendMail_(email, (done ? 'تم حل بلاغك ' : 'تحديث على بلاغك ') + id + ': ' + (STATUS_AR[status] || status),
     mailShell_({
       preheader: 'حالة بلاغك ' + id + ' الآن: ' + (STATUS_AR[status] || status),
@@ -489,6 +564,177 @@ function notifyReporter_(email, id, status, note) {
       ].concat(note ? [['ملاحظة الفريق الفني', esc_(note)]] : []),
       button: { text: 'عرض تفاصيل البلاغ', url: ticketUrl_(id) }
     }), 'تحديث على بلاغك ' + id);
+}
+
+function notifyResolved_(email, id, note) {
+  const days = Number(prop_('AUTOCLOSE_DAYS')) || 3;
+  const yes = ticketUrl_(id) + '&fb=yes', no = ticketUrl_(id) + '&fb=no';
+  const btn = (url, text, bg) => '<td align="center" style="padding:0 6px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="' + bg + '" style="border-radius:6px">' +
+    '<a href="' + url + '" target="_blank" style="display:inline-block;min-width:170px;padding:13px 18px;font-family:Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px">' + text + '</a></td></tr></table></td>';
+  sendMail_(email, 'تم حل بلاغك ' + id + ' — هل حُلّت مشكلتك؟',
+    mailShell_({
+      preheader: 'أنهى الفريق الفني معالجة بلاغك ' + id + '. أخبرنا: هل حُلّت مشكلتك؟',
+      title: 'تم حل بلاغك ✓',
+      intro: 'أنهى الفريق الفني معالجة بلاغك. نرجو تأكيد النتيجة بضغطة واحدة — إجابتك تساعدنا على قياس جودة الخدمة وتحسينها.',
+      steps: 'resolved',
+      rows: [
+        ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+        ['الحالة الحالية', badge_('resolved')],
+        ['وقت الحل', fmtDate_(new Date())]
+      ].concat(note ? [['الإجراء المتخذ', esc_(note)]] : []),
+      extra: '<p style="margin:24px 0 10px;text-align:center;font-size:17px;font-weight:bold;color:#3a1464;font-family:Tahoma,Arial,sans-serif">هل حُلّت مشكلتك؟</p>' +
+        '<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 8px"><tr>' +
+        btn(yes, '✓ نعم، حُلّت', '#1a7a43') + btn(no, '✗ لا، ما زالت المشكلة', '#c62828') + '</tr></table>' +
+        '<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#6b5a80;font-family:Tahoma,Arial,sans-serif">عند اختيار «لا» يُعاد فتح البلاغ تلقائيًا بأولوية أعلى. وإن لم يصلنا رد خلال ' + days + ' أيام يُغلق البلاغ تلقائيًا.</p>'
+    }), 'هل حُلّت مشكلتك؟ ' + id);
+}
+
+function notifyReopen_(id, user, building, issueType, note, assignee) {
+  const noc = prop_('NOTIFY_EMAIL');
+  if (!noc) return;
+  sendMail_(noc, '[NetPulse] أُعيد فتح البلاغ ' + id + ' — المشكلة لم تُحل',
+    mailShell_({
+      preheader: 'أفاد المستخدم بأن المشكلة في البلاغ ' + id + ' لم تُحل',
+      title: 'أُعيد فتح بلاغ',
+      intro: 'أفاد المُبلِّغ بأن المشكلة <b>لم تُحل</b> بعد إغلاقها، فأُعيد فتح البلاغ تلقائيًا ورُفعت أولويته.',
+      steps: 'open',
+      rows: [
+        ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+        ['المُبلِّغ', esc_(user.name) + '<br><span style="color:#6b5a80" dir="ltr">' + esc_(user.email) + '</span>'],
+        ['الموقع', esc_(building)], ['نوع المشكلة', esc_(issueType)],
+        ['المسؤول السابق', esc_(assignee || '—')],
+        ['تعليق المستخدم', esc_(note || '—')]
+      ],
+      button: { text: 'فتح البلاغ في المنصة', url: ticketUrl_(id) }
+    }), 'أُعيد فتح البلاغ ' + id);
+}
+
+function notifyReply_(email, id, status, note) {
+  sendMail_(email, 'رد جديد على بلاغك ' + id + ' — نبض الشبكة',
+    mailShell_({
+      preheader: 'رد من الفريق الفني على بلاغك ' + id,
+      title: 'رد من الفريق الفني',
+      intro: 'أضاف الفريق الفني ردًا على بلاغك:',
+      steps: status,
+      rows: [
+        ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+        ['الحالة الحالية', badge_(status)],
+        ['الرد', '<span style="color:#241436">' + esc_(note) + '</span>'],
+        ['وقت الرد', fmtDate_(new Date())]
+      ],
+      button: { text: 'عرض البلاغ', url: ticketUrl_(id) }
+    }), 'رد جديد على بلاغك ' + id);
+}
+
+/* ---------------- Weekly KPI report (every Sunday 07:00, Asia/Riyadh) ---------------- */
+
+function weekStats_(from, to, tickets, feedback, tests, log) {
+  const inR = d => d && new Date(d) >= from && new Date(d) < to;
+  const created = tickets.filter(t => inR(t.CreatedAt));
+  const resolved = tickets.filter(t => inR(t.ResolvedAt));
+  const fb = feedback.filter(f => inR(f.Timestamp));
+  const yes = fb.filter(f => f.Answer === 'yes').length, no = fb.filter(f => f.Answer === 'no').length;
+  const autoClosed = log.filter(l => l.Action === 'auto-closed' && inR(l.Timestamp)).length;
+  const reopenedIds = {}; log.filter(l => l.Action === 'reopened' && inR(l.Timestamp)).forEach(l => reopenedIds[l.TicketId] = 1);
+  const fr = created.filter(t => t.FirstResponseAt).map(t => (new Date(t.FirstResponseAt) - new Date(t.CreatedAt)) / 60000);
+  const rs = resolved.map(t => (new Date(t.ResolvedAt) - new Date(t.CreatedAt)) / 3600000);
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  const count = (arr, k) => { const m = {}; arr.forEach(t => { const v = t[k] || '—'; m[v] = (m[v] || 0) + 1; }); return Object.keys(m).map(x => [x, m[x]]).sort((a, b) => b[1] - a[1]); };
+  const wt = tests.filter(t => inR(t.Timestamp)).map(t => Number(t.DownloadMbps) || 0);
+  const answered = yes + no, asked = answered + autoClosed;
+  return {
+    created: created.length, resolved: resolved.length,
+    openAtEnd: tickets.filter(t => new Date(t.CreatedAt) < to && ['open', 'review', 'progress'].indexOf(t.Status) > -1).length,
+    sat: answered ? Math.round(yes * 100 / answered) : null, answers: answered,
+    respRate: asked ? Math.round(answered * 100 / asked) : null,
+    firstResp: avg(fr), resolveH: avg(rs),
+    reopened: Object.keys(reopenedIds).length,
+    reopenPct: resolved.length ? Math.round(Object.keys(reopenedIds).length * 100 / resolved.length) : null,
+    autoClosed: autoClosed,
+    byBuilding: count(created, 'Building'), byIssue: count(created, 'IssueType'),
+    reopenList: tickets.filter(t => reopenedIds[t.TicketId]),
+    tests: wt.length, medianDown: wt.length ? Math.round(median_(wt) * 10) / 10 : null
+  };
+}
+
+function sendWeeklyReport() {
+  const tz = 'Asia/Riyadh';
+  const end = new Date(Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'00:00:00") + '+03:00');   // today 00:00 Riyadh
+  const start = new Date(end.getTime() - 7 * 86400000), prevStart = new Date(start.getTime() - 7 * 86400000);
+  const T = readAll_(SHEETS.TICKETS), F = readAll_(SHEETS.FEEDBACK), S = readAll_(SHEETS.TESTS), L = readAll_(SHEETS.LOG);
+  const w = weekStats_(start, end, T, F, S, L), p = weekStats_(prevStart, start, T, F, S, L);
+  const tg = { sat: Number(prop_('TARGET_SAT')) || 85, resp: Number(prop_('TARGET_RESPONSE_MIN')) || 60,
+               res: Number(prop_('TARGET_RESOLVE_HOURS')) || 24, reo: Number(prop_('TARGET_REOPEN_PCT')) || 10 };
+  const d = x => Utilities.formatDate(x, tz, 'yyyy/MM/dd');
+  const period = d(start) + ' — ' + d(new Date(end.getTime() - 1));
+  const fmtMin = m => m === null ? '—' : (m < 60 ? Math.round(m) + ' دقيقة' : (m / 60).toFixed(1) + ' ساعة');
+  const fmtH = h => h === null ? '—' : (h < 48 ? h.toFixed(1) + ' ساعة' : (h / 24).toFixed(1) + ' يوم');
+  const pct = v => v === null ? '—' : v + '%';
+  const delta = (a, b, goodUp, unit) => {
+    if (a === null || b === null || a === b) return '<span style="color:#9a90aa">● ثابت</span>';
+    const up = a > b, good = goodUp ? up : !up;
+    return '<span style="color:' + (good ? '#1a7a43' : '#c62828') + '">' + (up ? '▲' : '▼') + ' ' + Math.abs(Math.round((a - b) * 10) / 10) + (unit || '') + '</span>';
+  };
+  const status = (ok) => ok === null ? '<span style="color:#9a90aa">لا بيانات</span>' :
+    ok ? '<span style="background:#e7f6ee;color:#1a7a43;padding:2px 10px;border-radius:10px;font-weight:bold">محقق</span>'
+       : '<span style="background:#fdecec;color:#c62828;padding:2px 10px;border-radius:10px;font-weight:bold">غير محقق</span>';
+  const cell = 'padding:9px 10px;border-bottom:1px solid #eee8f5;font-size:13px;font-family:Tahoma,Arial,sans-serif';
+  const th = 'padding:9px 10px;background:#f0ebf8;color:#501e8c;font-size:12px;font-weight:bold;font-family:Tahoma,Arial,sans-serif;text-align:right';
+  const kpiRows = [
+    ['نسبة رضا المستفيدين', pct(w.sat), tg.sat + '% فأكثر', delta(w.sat, p.sat, true, '%'), status(w.sat === null ? null : w.sat >= tg.sat)],
+    ['متوسط زمن الاستجابة الأولى', fmtMin(w.firstResp), tg.resp + ' دقيقة أو أقل', delta(w.firstResp && Math.round(w.firstResp), p.firstResp && Math.round(p.firstResp), false, ' د'), status(w.firstResp === null ? null : w.firstResp <= tg.resp)],
+    ['متوسط زمن الحل', fmtH(w.resolveH), tg.res + ' ساعة أو أقل', delta(w.resolveH && Math.round(w.resolveH * 10) / 10, p.resolveH && Math.round(p.resolveH * 10) / 10, false, ' س'), status(w.resolveH === null ? null : w.resolveH <= tg.res)],
+    ['نسبة البلاغات المُعاد فتحها', pct(w.reopenPct), tg.reo + '% أو أقل', delta(w.reopenPct, p.reopenPct, false, '%'), status(w.reopenPct === null ? null : w.reopenPct <= tg.reo)],
+    ['معدل الاستجابة لاستبيان الحل', pct(w.respRate), '—', delta(w.respRate, p.respRate, true, '%'), '—']
+  ];
+  const kpiTable = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee8f5;border-collapse:collapse;margin-top:6px">' +
+    '<tr><th style="' + th + '">المؤشر</th><th style="' + th + '">القيمة</th><th style="' + th + '">المستهدف</th><th style="' + th + '">مقارنة بالأسبوع السابق</th><th style="' + th + '">الحالة</th></tr>' +
+    kpiRows.map(r => '<tr>' + r.map((v, i) => '<td style="' + cell + (i === 1 ? ';font-weight:bold;color:#3a1464' : '') + '">' + v + '</td>').join('') + '</tr>').join('') + '</table>';
+  const tile = (label, val, sub) => '<td width="25%" align="center" style="padding:12px 4px;background:#faf8fd;border:1px solid #eee8f5;font-family:Tahoma,Arial,sans-serif">' +
+    '<div style="font-size:24px;font-weight:bold;color:#3a1464">' + val + '</div><div style="font-size:12px;color:#6b5a80">' + label + '</div>' +
+    (sub ? '<div style="font-size:11px;margin-top:2px">' + sub + '</div>' : '') + '</td>';
+  const tiles = '<table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:10px 0"><tr>' +
+    tile('بلاغات جديدة', w.created, delta(w.created, p.created, false)) + tile('بلاغات محلولة', w.resolved, delta(w.resolved, p.resolved, true)) +
+    tile('مفتوحة بنهاية الأسبوع', w.openAtEnd, '') + tile('أُغلقت تلقائيًا', w.autoClosed, '') + '</tr></table>';
+  const maxB = w.byBuilding.length ? w.byBuilding[0][1] : 1;
+  const bTable = w.byBuilding.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + w.byBuilding.slice(0, 6).map(r =>
+    '<tr><td width="38%" style="' + cell + '">' + esc_(r[0]) + '</td><td style="' + cell + '"><div style="background:#501e8c;height:12px;border-radius:6px;width:' + Math.max(6, Math.round(r[1] * 100 / maxB)) + '%"></div></td>' +
+    '<td width="70" style="' + cell + ';font-weight:bold">' + r[1] + ' <span style="color:#9a90aa;font-weight:normal">(' + Math.round(r[1] * 100 / (w.created || 1)) + '%)</span></td></tr>').join('') + '</table>'
+    : '<p style="color:#9a90aa;font-size:13px">لا توجد بلاغات هذا الأسبوع.</p>';
+  const iTable = w.byIssue.length ? '<p style="margin:6px 0 0;font-size:13px;line-height:2;font-family:Tahoma,Arial,sans-serif">' +
+    w.byIssue.slice(0, 6).map(r => '<span style="display:inline-block;background:#e6f3fa;color:#0a5a8a;border-radius:12px;padding:2px 10px;margin:2px">' + esc_(r[0]) + ' · <b>' + r[1] + '</b></span>').join(' ') + '</p>' : '';
+  const rTable = w.reopenList.length ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee8f5;border-collapse:collapse">' +
+    '<tr><th style="' + th + '">رقم البلاغ</th><th style="' + th + '">المبنى</th><th style="' + th + '">نوع المشكلة</th><th style="' + th + '">مرات إعادة الفتح</th></tr>' +
+    w.reopenList.map(t => '<tr><td style="' + cell + '"><a href="' + ticketUrl_(t.TicketId) + '" style="color:#0a6eaa">' + esc_(t.TicketId) + '</a></td><td style="' + cell + '">' + esc_(t.Building) + '</td><td style="' + cell + '">' + esc_(t.IssueType) + '</td><td style="' + cell + '">' + (Number(t.ReopenCount) || 1) + '</td></tr>').join('') + '</table>'
+    : '<p style="color:#1a7a43;font-size:13px">لا توجد بلاغات أُعيد فتحها هذا الأسبوع ✓</p>';
+  const h = (t) => '<h2 style="margin:22px 0 6px;font-size:16px;color:#3a1464;font-family:Tahoma,Arial,sans-serif;border-right:4px solid #1ba3d6;padding-right:8px">' + t + '</h2>';
+  const html = mailShell_({
+    preheader: 'التقرير الأسبوعي لنبض الشبكة ' + period + ' — الرضا ' + pct(w.sat) + ' · بلاغات ' + w.created,
+    title: 'التقرير الأسبوعي لجودة الإنترنت',
+    intro: 'ملخص أداء خدمة الإنترنت ومعالجة البلاغات للفترة <b dir="ltr">' + period + '</b>، مع مؤشرات الأداء مقابل المستهدفات لاستخدامها دليلًا في الخطة التشغيلية.',
+    extra: tiles + h('مؤشرات الأداء الرئيسية (KPIs)') + kpiTable +
+      h('أكثر المباني بلاغات') + bTable + iTable +
+      h('البلاغات المُعاد فتحها') + rTable +
+      h('جودة الاتصال من قياسات المستخدمين') +
+      '<p style="font-size:13px;color:#3d2f52;font-family:Tahoma,Arial,sans-serif;line-height:1.9">عدد القياسات: <b>' + w.tests + '</b> · وسيط سرعة التحميل: <b dir="ltr">' + (w.medianDown === null ? '—' : w.medianDown + ' Mbps') + '</b> (الأسبوع السابق: <span dir="ltr">' + (p.medianDown === null ? '—' : p.medianDown + ' Mbps') + '</span>)</p>' +
+      '<p style="margin-top:14px;font-size:12px;color:#6b5a80;font-family:Tahoma,Arial,sans-serif">📎 مرفق: سجل بلاغات الأسبوع (CSV). تُحفظ مؤشرات كل أسبوع تلقائيًا في تبويب <b>WeeklyKPIs</b> كسجل تراكمي للأدلة.</p>',
+    button: { text: 'فتح لوحة الفريق الفني', url: appUrl_() ? appUrl_() + '#team' : '' }, extraFirst: true
+  });
+  // CSV attachment of the week's tickets
+  const cols = ['TicketId', 'CreatedAt', 'Name', 'Email', 'Mobile', 'Department', 'Building', 'IssueType', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'Feedback', 'ReopenCount', 'Description', 'Resolution'];
+  const wk = T.filter(t => t.CreatedAt && new Date(t.CreatedAt) >= start && new Date(t.CreatedAt) < end);
+  const csv = '﻿' + cols.join(',') + '\n' + wk.map(t => cols.map(c => '"' + String(t[c] instanceof Date ? Utilities.formatDate(t[c], tz, 'yyyy-MM-dd HH:mm') : (t[c] === undefined ? '' : t[c])).replace(/^'/, '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  const att = Utilities.newBlob(csv, 'text/csv', 'NetPulse-tickets-' + Utilities.formatDate(start, tz, 'yyyy-MM-dd') + '.csv');
+  const to = prop_('REPORT_EMAILS') || 'm.elmahdy@sr.edu.sa';
+  MailApp.sendEmail({ to: to, subject: '📊 التقرير الأسبوعي — نبض الشبكة (' + period + ')', name: 'نبض الشبكة — SRU NetPulse',
+    htmlBody: html, inlineImages: brandBlobs_(), attachments: [att], body: 'التقرير الأسبوعي لنبض الشبكة ' + period });
+  appendRow_(SHEETS.WEEKLY, { WeekStart: start, WeekEnd: new Date(end.getTime() - 1), NewTickets: w.created, Resolved: w.resolved, OpenAtEnd: w.openAtEnd,
+    SatisfactionPct: w.sat === null ? '' : w.sat, ResponseRatePct: w.respRate === null ? '' : w.respRate, Answers: w.answers,
+    AvgFirstResponseMin: w.firstResp === null ? '' : Math.round(w.firstResp), AvgResolveHours: w.resolveH === null ? '' : Math.round(w.resolveH * 10) / 10,
+    Reopened: w.reopened, ReopenPct: w.reopenPct === null ? '' : w.reopenPct, AutoClosed: w.autoClosed,
+    TopBuilding: w.byBuilding.length ? w.byBuilding[0][0] : '', TopIssue: w.byIssue.length ? w.byIssue[0][0] : '',
+    SpeedTests: w.tests, MedianDownMbps: w.medianDown === null ? '' : w.medianDown, SentTo: to, SentAt: new Date() });
+  return to;
 }
 
 function badge_(st) {
@@ -532,7 +778,7 @@ function mailShell_(o) {
       '<p style="margin:0;font-size:14px;line-height:1.9;color:#3d2f52">' + o.intro + '</p>' +
       (o.steps ? steps_(o.steps) : '') +
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border:1px solid #eee8f5;border-radius:8px;overflow:hidden">' + rows + '</table>' +
-      btn +
+      (o.extraFirst ? (o.extra || '') + btn : btn + (o.extra || '')) +
       (o.note ? '<p style="margin:18px 0 0;padding:10px 14px;background:#e6f3fa;border-radius:6px;font-size:13px;color:#0a5a8a;line-height:1.8">💡 ' + o.note + '</p>' : '') +
     '</td></tr>' +
     // footer
@@ -567,6 +813,12 @@ function setup() {
   }
   const p = PropertiesService.getScriptProperties();
   if (!p.getProperty('TICKET_SEQ')) p.setProperty('TICKET_SEQ', '1000');
+  if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'autoCloseResolved')) {
+    ScriptApp.newTrigger('autoCloseResolved').timeBased().everyDays(1).atHour(6).create();
+  }
+  if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'sendWeeklyReport')) {
+    ScriptApp.newTrigger('sendWeeklyReport').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(7).create();
+  }
   ss_().toast('SRU NetPulse: setup complete (v' + APP.VERSION + ')');
 }
 
@@ -620,6 +872,7 @@ function publicTicket_(r) {
     assignee: r.Assignee, firstResponseAt: iso_(r.FirstResponseAt), resolvedAt: iso_(r.ResolvedAt),
     updatedAt: iso_(r.UpdatedAt), resolution: r.Resolution,
     mobile: String(r.Mobile || '').replace(/^'/, ''),
+    feedback: r.Feedback || '', feedbackAt: iso_(r.FeedbackAt), reopenCount: Number(r.ReopenCount) || 0,
     test: r.DownloadMbps !== '' ? { download: Number(r.DownloadMbps), upload: Number(r.UploadMbps), ping: Number(r.PingMs) } : null
   };
 }

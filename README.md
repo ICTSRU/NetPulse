@@ -1,4 +1,4 @@
-# نبض الشبكة — SRU NetPulse · v1.2
+# نبض الشبكة — SRU NetPulse · v1.4
 
 منصة متابعة جودة الإنترنت ودعم الأعطال لجامعة سليمان الراجحي — الإدارة التنفيذية للاتصالات وتقنية المعلومات / مركز عمليات تقنية المعلومات (ITOC).
 
@@ -7,7 +7,7 @@
 | Frontend | `index.html` — single-file Arabic RTL app (GitHub Pages) |
 | Backend | Google Apps Script Web App (`backend/Code.gs`) |
 | Database | Google Sheet (7 tabs, auto-created by `setup()`) |
-| Auth | Google Sign-In, **@sr.edu.sa only**, verified server-side; every sign-in logged |
+| Auth | Google Sign-In, **@sr.edu.sa or @srcolleges.org**, verified server-side; every sign-in logged (with mobile) |
 | Speed test | Cloudflare speed endpoints (download / upload / ping / jitter) |
 
 ## Brand
@@ -30,11 +30,12 @@ Roles (`Users` tab, column `Role`): `user` (default for everyone) · `tech` · `
 ## Deployment (≈15 minutes)
 1. **Sheet + script** — create a Google Sheet "SRU NetPulse DB" → Extensions → Apps Script. Paste `backend/Code.gs`; enable "Show appsscript.json" in Project Settings and paste `backend/appsscript.json`.
 2. Run **`setup`** once (authorize). Edit the `Locations` tab to SRU's real buildings/zones (seed rows are placeholders).
-3. **OAuth Client ID** — Google Cloud Console → APIs & Services → Credentials → *OAuth client ID* → *Web application*. Authorized JavaScript origin: `https://ictsru.github.io` (and any test origin). Consent screen: **Internal**.
+3. **OAuth Client ID** — Google Cloud Console → APIs & Services → Credentials → *OAuth client ID* → *Web application*. Authorized JavaScript origin: `https://ictsru.github.io` (and any test origin). Consent screen: **Internal** if srcolleges.org is a domain in the same Google Workspace as sr.edu.sa; **External** (published, no sensitive scopes) if it is a separate Workspace — the backend still rejects every other domain.
 4. **Script properties** (Project Settings):
    | Key | Value |
    |---|---|
    | `CLIENT_ID` | the client ID from step 3 |
+   | `ALLOWED_DOMAINS` | optional, default `sr.edu.sa,srcolleges.org` |
    | `ADMIN_EMAILS` | e.g. `m.elmahdy@sr.edu.sa` |
    | `NOTIFY_EMAIL` | NOC / helpdesk mailbox |
    | `MONITOR_KEY` | long random secret (for monitoring push) |

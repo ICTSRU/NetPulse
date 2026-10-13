@@ -1,5 +1,21 @@
 # Changelog — SRU NetPulse
 
+## v1.4 — 2026-10-13
+### Changed
+- Backend Web App URL hard-coded in `CONFIG.API_URL`: `https://script.google.com/macros/s/AKfycbwNQJ7YyuuCc9grSfxDYrvz04e4-zOBKMKG3aa19pPc7fV8lEBXu473KOMp7X8hLVNIsQ/exec`.
+- Demo mode now runs only when `API_URL` is empty; with the URL set the platform always uses the live Google Sheet.
+### Added
+- Startup reachability check: the sign-in screen shows a clear message if the Web App is not deployed with access "Anyone" or if `CLIENT_ID` is missing.
+
+## v1.3 — 2026-10-13
+### Added
+- Sign-in now accepts **@sr.edu.sa and @srcolleges.org** (frontend `CONFIG.DOMAINS`; backend Script property `ALLOWED_DOMAINS`, default `sr.edu.sa,srcolleges.org`). The Google ID token's `hd` must match one of them.
+- **Mobile number**: required once at first sign-in (profile prompt), editable from the top-bar phone icon, pre-filled and required on every report. Saudi numbers normalised to `+9665XXXXXXXX`; international `+E.164` accepted; Arabic-Indic digits accepted.
+- `Mobile` column in `Users`, `Tickets` and `SignInLog`; mobile shown (tap-to-call) in the ticket panel, included in CSV export and in the NOC new-ticket e-mail.
+- Automatic schema migration: the backend appends any missing header to existing tabs, so the v1.2 Sheet upgrades in place.
+### Changed
+- Version bumped to 1.3.
+
 ## v1.2 — 2026-10-13
 ### Added
 - Official platform logo (approved option 6 — «نبض الشبكة» ring + pulse badge) as a full brand pack in `assets/brand/`: SVG (mark, white, mono, lockup, white lockup, app icon), PNG sizes, `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`, `site.webmanifest`.

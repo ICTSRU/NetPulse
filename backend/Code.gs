@@ -2,12 +2,12 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.2  (2026-10-13)
+ *  Version: 1.4  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
  *    CLIENT_ID       (required) Google OAuth Web Client ID used by the frontend
- *    ALLOWED_DOMAIN  (optional) default: sr.edu.sa
+ *    ALLOWED_DOMAINS (optional) comma-separated, default: sr.edu.sa,srcolleges.org
  *    ADMIN_EMAILS    (optional) comma-separated bootstrap admins
  *    NOTIFY_EMAIL    (optional) NOC/helpdesk mailbox notified on every new ticket
  *    MONITOR_KEY     (optional) shared secret for the monitoring push endpoint
@@ -18,15 +18,15 @@
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.2' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '1.4' };
 
 const SHEETS = {
-  SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client'] },
-  USERS:    { name: 'Users',         headers: ['Email', 'Name', 'Role', 'Active', 'Notes'] },
+  SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
+  USERS:    { name: 'Users',         headers: ['Email', 'Name', 'Role', 'Active', 'Notes', 'Mobile'] },
   LOCS:     { name: 'Locations',     headers: ['Building', 'College', 'Active', 'SortOrder'] },
   NETSTAT:  { name: 'NetworkStatus', headers: ['Building', 'Status', 'Source', 'Note', 'UpdatedAt', 'UpdatedBy'] },
   TESTS:    { name: 'SpeedTests',    headers: ['Timestamp', 'Email', 'Building', 'DownloadMbps', 'UploadMbps', 'PingMs', 'JitterMs', 'Connection', 'Server', 'Client'] },
-  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs'] },
+  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile'] },
   LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] }
 };
 
@@ -54,6 +54,7 @@ function doPost(e) {
     const user = authenticate_(body.idToken);
     switch (action) {
       case 'login':          return json_(login_(user, body));
+      case 'saveProfile':    return json_(saveProfile_(user, body.data || {}));
       case 'getStatus':      return json_({ ok: true, buildings: buildingStatus_() });
       case 'saveSpeedTest':  return json_(saveSpeedTest_(user, body.data || {}));
       case 'createTicket':   return json_(createTicket_(user, body.data || {}));
@@ -85,12 +86,13 @@ function authenticate_(idToken) {
   const info = JSON.parse(res.getContentText());
 
   const clientId = prop_('CLIENT_ID');
-  const domain = (prop_('ALLOWED_DOMAIN') || 'sr.edu.sa').toLowerCase();
+  const domains = allowedDomains_();
   const email = String(info.email || '').toLowerCase();
+  const domain = email.split('@')[1] || '';
 
   if (!clientId || info.aud !== clientId) throw new Error('AUTH_AUDIENCE');
   if (String(info.email_verified) !== 'true') throw new Error('AUTH_UNVERIFIED');
-  if (!email.endsWith('@' + domain) || String(info.hd || '').toLowerCase() !== domain) throw new Error('AUTH_DOMAIN');
+  if (domains.indexOf(domain) === -1 || String(info.hd || '').toLowerCase() !== domain) throw new Error('AUTH_DOMAIN');
 
   const user = { email: email, name: info.name || email, picture: info.picture || '', role: roleOf_(email) };
   const ttl = Math.max(60, Math.min(600, Number(info.exp) - Math.floor(Date.now() / 1000)));
@@ -98,10 +100,44 @@ function authenticate_(idToken) {
   return user;
 }
 
+function allowedDomains_() {
+  return (prop_('ALLOWED_DOMAINS') || 'sr.edu.sa,srcolleges.org').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function userRow_(email) {
+  return readAll_(SHEETS.USERS).find(r => String(r.Email).toLowerCase() === email) || null;
+}
+
+/** Saudi mobiles → +9665XXXXXXXX; other international numbers accepted in +E.164 form. */
+function normalizeMobile_(v) {
+  let s = String(v || '').replace(/[\s\-().]/g, '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  if (/^00/.test(s)) s = '+' + s.slice(2);
+  let m;
+  if ((m = s.match(/^(?:\+?966|0)?(5\d{8})$/))) return '+966' + m[1];
+  if (/^\+\d{8,15}$/.test(s)) return s;
+  throw new Error('BAD_MOBILE');
+}
+
+function saveProfile_(user, d) {
+  const mobile = normalizeMobile_(d.mobile);
+  upsertUserMobile_(user, mobile);
+  return { ok: true, mobile: mobile };
+}
+
+function upsertUserMobile_(user, mobile) {
+  const sh = sheet_(SHEETS.USERS);
+  const data = sh.getDataRange().getValues();
+  const H = data[0];
+  const ce = H.indexOf('Email'), cm = H.indexOf('Mobile');
+  const idx = data.findIndex((r, i) => i > 0 && String(r[ce]).toLowerCase() === user.email);
+  if (idx > 0) sh.getRange(idx + 1, cm + 1).setValue("'" + mobile);
+  else appendRow_(SHEETS.USERS, { Email: user.email, Name: user.name, Role: 'user', Active: true, Notes: 'self-registered', Mobile: "'" + mobile });
+}
+
 function roleOf_(email) {
   const admins = (prop_('ADMIN_EMAILS') || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   if (admins.indexOf(email) > -1) return 'admin';
-  const u = readAll_(SHEETS.USERS).find(r => String(r.Email).toLowerCase() === email);
+  const u = userRow_(email);
   if (u && String(u.Active).toLowerCase() !== 'false' && ROLES.indexOf(String(u.Role)) > -1) return String(u.Role);
   return 'user';
 }
@@ -114,12 +150,14 @@ function requireRole_(user, roles) {
 
 function login_(user, body) {
   const now = new Date();
+  const row = userRow_(user.email);
+  user.mobile = row && row.Mobile ? String(row.Mobile).replace(/^'/, '') : '';
   const tz = Session.getScriptTimeZone();
   appendRow_(SHEETS.SIGNIN, {
     Timestamp: now, Email: user.email, Name: user.name,
     Date: Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
     Time: Utilities.formatDate(now, tz, 'HH:mm:ss'),
-    Role: user.role, Client: clean_(body.client, 200)
+    Role: user.role, Client: clean_(body.client, 200), Mobile: user.mobile ? "'" + user.mobile : ''
   });
   return {
     ok: true, user: user, version: APP.VERSION,
@@ -147,6 +185,10 @@ function saveSpeedTest_(user, d) {
 function createTicket_(user, d) {
   const desc = clean_(d.description, 500);
   if (!d.building || !d.issueType || desc.length < 5) throw new Error('MISSING_FIELDS');
+  const mobile = normalizeMobile_(d.mobile);
+  const row0 = userRow_(user.email);
+  if (!row0 || !row0.Mobile) upsertUserMobile_(user, mobile);
+  d.mobile = mobile;
 
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -165,7 +207,7 @@ function createTicket_(user, d) {
       Status: 'open', Priority: suggestPriority_(d), Assignee: '', FirstResponseAt: '', ResolvedAt: '',
       UpdatedAt: now, Resolution: '',
       DownloadMbps: d.test ? num_(d.test.download) : '', UploadMbps: d.test ? num_(d.test.upload) : '',
-      PingMs: d.test ? num_(d.test.ping) : ''
+      PingMs: d.test ? num_(d.test.ping) : '', Mobile: "'" + mobile
     });
     appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: id, Action: 'created', Status: 'open', Note: '', By: user.email });
   } finally { lock.releaseLock(); }
@@ -326,7 +368,7 @@ function notifyNewTicket_(id, user, d, desc) {
       to: noc,
       subject: '[NetPulse] بلاغ جديد ' + id + ' — ' + d.building + ' — ' + d.issueType,
       htmlBody: mailShell_('بلاغ جديد ' + id,
-        '<p><b>المُبلِّغ:</b> ' + esc_(user.name) + ' (' + esc_(user.email) + ')<br><b>الموقع:</b> ' + esc_(d.building) + ' — ' + esc_(d.spot || '') +
+        '<p><b>المُبلِّغ:</b> ' + esc_(user.name) + ' (' + esc_(user.email) + ')<br><b>الجوال:</b> <span dir="ltr">' + esc_(d.mobile) + '</span><br><b>الموقع:</b> ' + esc_(d.building) + ' — ' + esc_(d.spot || '') +
         '<br><b>نوع المشكلة:</b> ' + esc_(d.issueType) + '<br><b>الوصف:</b> ' + esc_(desc) +
         (d.test ? '<br><b>آخر قياس:</b> ' + num_(d.test.download) + ' / ' + num_(d.test.upload) + ' Mbps — ' + num_(d.test.ping) + ' ms' : '') + '</p>')
     });
@@ -374,7 +416,7 @@ function setup() {
   }
   const p = PropertiesService.getScriptProperties();
   if (!p.getProperty('TICKET_SEQ')) p.setProperty('TICKET_SEQ', '1000');
-  SpreadsheetApp.getActive().toast('SRU NetPulse: setup complete (v' + APP.VERSION + ')');
+  ss_().toast('SRU NetPulse: setup complete (v' + APP.VERSION + ')');
 }
 
 /* ---------------- Helpers ---------------- */
@@ -393,6 +435,14 @@ function sheet_(def) {
       .setFontWeight('bold').setBackground('#501e8c').setFontColor('#ffffff');
     sh.setFrozenRows(1);
     sh.setRightToLeft(true);
+  } else {
+    // Schema migration: append any header the current version expects but the sheet lacks.
+    const have = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(String);
+    const missing = def.headers.filter(h => have.indexOf(h) === -1);
+    if (missing.length) {
+      sh.getRange(1, have.filter(Boolean).length + 1, 1, missing.length).setValues([missing])
+        .setFontWeight('bold').setBackground('#501e8c').setFontColor('#ffffff');
+    }
   }
   return sh;
 }
@@ -418,6 +468,7 @@ function publicTicket_(r) {
     occurredAt: iso_(r.OccurredAt), description: r.Description, status: r.Status, priority: r.Priority,
     assignee: r.Assignee, firstResponseAt: iso_(r.FirstResponseAt), resolvedAt: iso_(r.ResolvedAt),
     updatedAt: iso_(r.UpdatedAt), resolution: r.Resolution,
+    mobile: String(r.Mobile || '').replace(/^'/, ''),
     test: r.DownloadMbps !== '' ? { download: Number(r.DownloadMbps), upload: Number(r.UploadMbps), ping: Number(r.PingMs) } : null
   };
 }

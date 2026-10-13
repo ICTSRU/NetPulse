@@ -162,6 +162,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .drawer h3{display:flex;align-items:center;gap:8px;margin-top:0}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;font-size:14px;margin-bottom:14px}
 .kv span{color:var(--muted)}
+.overlay.center{justify-content:center;align-items:center;padding:16px}
+.modal{background:#fff;border-radius:8px;width:min(440px,100%);padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:var(--purple)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:var(--radius);z-index:60;font-weight:600}
 
 /* ---------- sign-in ---------- */
@@ -210,7 +213,7 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
       <img class="np-sign" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse">
       <h1 class="sr-only">نبض الشبكة — SRU NetPulse</h1>
       <p>قِس سرعة الإنترنت، واطّلع على حالة الشبكة في مبناك، وأبلغ عن ضعف الاتصال وتابع معالجة بلاغك.</p>
-      <div class="note"><i data-lucide="shield-check"></i><div>الدخول متاح لمنسوبي الجامعة وطلابها فقط باستخدام البريد الجامعي <b class="en">@sr.edu.sa</b>. ستنتقل بعد الضغط على الزر إلى صفحة تسجيل الدخول من Google.</div></div>
+      <div class="note"><i data-lucide="shield-check"></i><div>الدخول متاح لمنسوبي الجامعة وطلابها فقط باستخدام البريد الجامعي <b class="en">@sr.edu.sa</b> أو <b class="en">@srcolleges.org</b>. ستنتقل بعد الضغط على الزر إلى صفحة تسجيل الدخول من Google.</div></div>
       <div id="gbtn"></div>
       <div class="err" id="signErr"></div>
       <div class="by-itoc"><span>تُدار المنصة بواسطة</span><img src="assets/itoc-logo.png" alt="ITOC — IT Operations Center"></div>
@@ -243,7 +246,8 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
     <div class="sp"></div>
     <div class="clock"><i data-lucide="calendar-clock"></i><span id="clock"></span></div>
     <div class="userchip"><span id="uAvatar"></span><div><span id="uName"></span><small id="uRole"></small></div></div>
-    <button class="iconbtn" onclick="signOut()" title="تسجيل الخروج"><i data-lucide="log-out"></i></button>
+    <button class="iconbtn" onclick="openProfile(false)" title="بياناتي" aria-label="بياناتي"><i data-lucide="smartphone"></i></button>
+    <button class="iconbtn" onclick="signOut()" title="تسجيل الخروج" aria-label="تسجيل الخروج"><i data-lucide="log-out"></i></button>
   </div>
   <div class="layout">
     <nav class="side" id="nav">
@@ -269,19 +273,19 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v1.2
+ * SRU NetPulse — Frontend v1.4
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '1.2',
-  API_URL: '',
+  VERSION: '1.4',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwNQJ7YyuuCc9grSfxDYrvz04e4-zOBKMKG3aa19pPc7fV8lEBXu473KOMp7X8hLVNIsQ/exec',
   CLIENT_ID: '',
-  DOMAIN: 'sr.edu.sa',
+  DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
   SPEED_SERVER: 'https://speed.cloudflare.com',
   DEPARTMENTS_URL: 'https://dt.sr.edu.sa/digital-enablement/packages/sru-departments.json'
 };
-const DEMO = !CONFIG.API_URL || !CONFIG.CLIENT_ID;
+const DEMO = !CONFIG.API_URL;
 
 /* Canonical SRU departments (sru-departments.json, verbatim) — used as fallback if live fetch fails */
 let DEPARTMENTS = [
@@ -316,7 +320,7 @@ function toast(msg){ const t=document.createElement('div'); t.className='toast';
 function dur(ms){ if(!(ms>0)) return '—'; const m=Math.round(ms/60000); if(m<60) return m+' دقيقة'; const h=(m/60); return h<48? h.toFixed(1)+' ساعة' : (h/24).toFixed(1)+' يوم'; }
 function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
 function localInput(d=new Date()){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
-const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي @sr.edu.sa فقط.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.'};
+const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي فقط (@sr.edu.sa أو @srcolleges.org).',BAD_MOBILE:'رقم الجوال غير صحيح. استخدم الصيغة 05XXXXXXXX.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.'};
 
 /* ---------------- API (real or demo) ---------------- */
 async function api(action, payload={}){
@@ -335,9 +339,11 @@ function initSignin(){
   document.querySelectorAll('.appver').forEach(e=>e.textContent=CONFIG.VERSION);
   icons();
   if (DEMO) { $('#demoEntry').classList.remove('hidden'); $('#gbtn').innerHTML='<span class="hint">وضع العرض التجريبي</span>'; return; }
+  checkBackend();
+  if (!CONFIG.CLIENT_ID) { $('#gbtn').innerHTML=''; $('#signErr').textContent='لم يُضبط معرّف تسجيل الدخول (CLIENT_ID) بعد — يرجى التواصل مع مركز عمليات تقنية المعلومات.'; return; }
   const boot = () => {
     if (!window.google || !google.accounts) return setTimeout(boot, 200);
-    google.accounts.id.initialize({ client_id: CONFIG.CLIENT_ID, hd: CONFIG.DOMAIN, callback: onCredential, auto_select: true, ux_mode:'popup' });
+    google.accounts.id.initialize({ client_id: CONFIG.CLIENT_ID, callback: onCredential, auto_select: true, ux_mode:'popup' });
     google.accounts.id.renderButton($('#gbtn'), { theme:'filled_blue', size:'large', text:'signin_with', shape:'rectangular', locale:'ar', width: 300 });
   };
   boot();
@@ -346,11 +352,22 @@ async function onCredential(resp){
   $('#signErr').textContent = '';
   try {
     const payload = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-    if (payload.hd !== CONFIG.DOMAIN) throw new Error(ERR_AR.AUTH_DOMAIN);
+    if (!CONFIG.DOMAINS.includes(String(payload.hd||'').toLowerCase())) throw new Error(ERR_AR.AUTH_DOMAIN);
     S.token = resp.credential;
     const out = await api('login', { client: navigator.userAgent.slice(0,180) });
     startApp(out);
   } catch(e){ S.token=null; $('#signErr').textContent = e.message; }
+}
+/* Backend reachability check — the Web App must be deployed with access "Anyone" */
+async function checkBackend(){
+  try {
+    const r = await fetch(CONFIG.API_URL, { cache:'no-store' });
+    const j = await r.json();
+    if (!j.ok) throw new Error('bad');
+    console.info('NetPulse backend v' + j.version + ' reachable');
+  } catch(e) {
+    $('#signErr').textContent = 'تعذّر الاتصال بخادم المنصة. إن كنت مسؤول النظام: تأكد أن نشر Apps Script مضبوط على «Who has access: Anyone».';
+  }
 }
 function demoLogin(role){
   S.token='demo';
@@ -375,6 +392,30 @@ function startApp(out){
   loadDepartments();
   tick(); setInterval(tick, 30000);
   route();
+  if (!S.user.mobile) openProfile(true);
+}
+
+/* ---------------- Profile (mobile number) ---------------- */
+function mobileOk(v){ const s=String(v||'').replace(/[\s\-().]/g,'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)); return /^(?:\+?966|0|00966)?5\d{8}$/.test(s) || /^(?:\+|00)\d{8,15}$/.test(s); }
+function openProfile(required){
+  const ov=document.createElement('div'); ov.className='overlay center'; ov.id='profileOv';
+  if(!required) ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<form class="modal" onsubmit="saveProfile(event)">
+    <h3><i data-lucide="smartphone"></i>${required?'أكمل بياناتك':'بياناتي'}</h3>
+    <p class="hint">${required?'نحتاج رقم جوالك ليتواصل معك الفريق الفني بشأن بلاغاتك عند الحاجة.':'يُستخدم رقم الجوال للتواصل بشأن بلاغاتك فقط.'}</p>
+    <div class="kv" style="grid-template-columns:110px 1fr"><span>الاسم</span><div>${esc(S.user.name)}</div><span>البريد</span><div class="en">${esc(S.user.email)}</div></div>
+    <div class="field"><label class="f" for="pm">رقم الجوال <span style="color:var(--bad)">*</span></label>
+      <input type="tel" id="pm" dir="ltr" inputmode="tel" autocomplete="tel" required placeholder="05XXXXXXXX" value="${esc(S.user.mobile||'')}" style="text-align:left">
+      <div class="hint">مثال: <span class="en">0501234567</span> — وتُقبل الأرقام الدولية بصيغة <span class="en">+XXXXXXXXXX</span></div><div class="err" id="pmErr"></div></div>
+    <div class="row"><button class="btn" style="flex:1"><i data-lucide="save"></i>حفظ</button>${required?'':'<button type="button" class="btn sec" onclick="this.closest(\'.overlay\').remove()">إلغاء</button>'}</div>
+  </form>`;
+  document.body.appendChild(ov); icons(); setTimeout(()=>$('#pm').focus(),50);
+}
+async function saveProfile(ev){
+  ev.preventDefault(); const v=$('#pm').value.trim();
+  if(!mobileOk(v)){ $('#pmErr').textContent=ERR_AR.BAD_MOBILE; return; }
+  try{ const o=await api('saveProfile',{data:{mobile:v}}); S.user.mobile=o.mobile; $('#profileOv').remove(); toast('تم حفظ رقم الجوال'); if(S.view==='report') route(); }
+  catch(e){ $('#pmErr').textContent=e.message; }
 }
 const isStaff = () => S.user && (S.user.role==='tech' || S.user.role==='admin');
 function tick(){ $('#clock').textContent = new Date().toLocaleString(LOC,{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit'}); }
@@ -565,6 +606,7 @@ function vReport(){
           <div class="field"><label class="f">المبنى <span style="color:var(--bad)">*</span></label><select id="rb" required>${buildingOptions(p.building||myBuilding())}</select></div>
           <div class="field"><label class="f">الموقع التفصيلي</label><input type="text" id="rs" maxlength="120" placeholder="مثال: الدور الثاني — قاعة 214"></div>
           <div class="field"><label class="f">وقت المشكلة</label><input type="datetime-local" id="ro" value="${localInput()}"></div>
+          <div class="field"><label class="f" for="rm">رقم الجوال للتواصل <span style="color:var(--bad)">*</span></label><input type="tel" id="rm" dir="ltr" inputmode="tel" required placeholder="05XXXXXXXX" value="${esc(S.user.mobile||'')}" style="text-align:left"></div>
           <div class="field"><label class="f">نوع الاتصال</label><select id="rc">${['Wi-Fi','سلكي (Ethernet)','بيانات الجوال'].map(c=>`<option ${p.connection===c?'selected':''}>${c}</option>`).join('')}</select></div>
         </div>
         <div class="field"><label class="f">وصف المشكلة <span style="color:var(--bad)">*</span></label>
@@ -590,11 +632,13 @@ async function submitReport(ev){
   const b=$('#rsend'); b.disabled=true; b.innerHTML='جارٍ الإرسال…';
   const data = { department:$('#rd').value, issueType:$('#rt').value, building:$('#rb').value, spot:$('#rs').value.trim(),
     occurredAt: $('#ro').value ? new Date($('#ro').value).toISOString() : '', connection:$('#rc').value,
-    description:$('#rx').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping} : null };
+    description:$('#rx').value.trim(), mobile:$('#rm').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping} : null };
+  if (!mobileOk(data.mobile)) { toast(ERR_AR.BAD_MOBILE); b.disabled=false; b.innerHTML='<i data-lucide="send"></i>إرسال البلاغ'; icons(); return; }
   try {
     try{ localStorage.setItem('np_dept', data.department); }catch(e){}
     setMyBuilding(data.building);
     const out = await api('createTicket',{data});
+    if (!S.user.mobile) S.user.mobile = data.mobile;
     S.tickets = (await api('myTickets')).tickets;
     $('#rside').outerHTML = `<div class="success" id="rside"><div class="big"><i data-lucide="check"></i></div><h3 style="justify-content:center;color:var(--ok)">تم استلام البلاغ</h3><div class="hint">وتم تحويله إلى الفريق الفني</div><div class="hint" style="margin-top:10px">رقم البلاغ:</div><div class="tno en">${esc(out.ticketId)}</div><div class="hint">${fmtDT(new Date().toISOString())}</div><button class="btn sec" style="margin-top:12px" onclick="openTicket('${esc(out.ticketId)}')">متابعة البلاغ</button></div>`;
     $('#rform').reset(); $('#ro').value=localInput(); $('#rcnt').textContent='0/500';
@@ -629,6 +673,7 @@ async function openTicket(id){
       <div class="kv" style="margin-top:14px">
         <span>الحالة</span><div>${chip(T_STATUS,t.status)} ${staff?chip(PRIO,t.priority):''}</div>
         ${staff?`<span>المُبلِّغ</span><div>${esc(t.name)} <span class="en hint">${esc(t.email)}</span></div>`:''}
+        ${t.mobile?`<span>الجوال</span><div><a class="en" href="tel:${esc(t.mobile)}">${esc(t.mobile)}</a></div>`:''}
         <span>الجهة</span><div>${esc(t.department||'—')}</div>
         <span>الموقع</span><div>${esc(t.building)}${t.spot?' — '+esc(t.spot):''}</div>
         <span>نوع المشكلة</span><div>${esc(t.issueType)} <span class="hint">(${esc(t.connection||'')})</span></div>
@@ -741,7 +786,7 @@ function currentFiltered(){
 }
 function filterTickets(){ const l=currentFiltered(); $('#tbl').innerHTML = l.length? ticketTable(l,true) : '<div class="empty"><i data-lucide="inbox"></i>لا توجد نتائج</div>'; icons(); }
 function exportCSV(){
-  const cols=['id','createdAt','name','email','department','building','spot','issueType','connection','status','priority','assignee','firstResponseAt','resolvedAt','description','resolution'];
+  const cols=['id','createdAt','name','email','mobile','department','building','spot','issueType','connection','status','priority','assignee','firstResponseAt','resolvedAt','description','resolution'];
   const rows=[cols.join(',')].concat(currentFiltered().map(t=>cols.map(c=>'"'+String(t[c]??'').replace(/"/g,'""')+'"').join(',')));
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+rows.join('\n')],{type:'text/csv'})); a.download='netpulse-tickets-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
 }
@@ -784,7 +829,7 @@ function demoDB(){
   if (db && db.v===CONFIG.VERSION) return db;
   const now=Date.now(), h=36e5;
   const L=['مبنى كلية الطب','مبنى كلية التمريض','مبنى كلية العلوم التطبيقية','مبنى كلية الأعمال','المبنى الإداري','المكتبة','شطر الطالبات','السكن الجامعي'];
-  const mk=(n,hrs,b,type,st,name,desc,resp)=>({id:'NP-'+n,createdAt:new Date(now-hrs*h).toISOString(),email:'demo.user@sr.edu.sa',name,department:'كلية الطب',building:b,spot:'',issueType:type,connection:'Wi-Fi',occurredAt:new Date(now-hrs*h).toISOString(),description:desc,status:st,priority:type==='انقطاع كامل'?'high':'medium',assignee:st==='open'?'':'فريق الشبكات',firstResponseAt:resp?new Date(now-(hrs-resp)*h).toISOString():'',resolvedAt:st==='resolved'?new Date(now-(hrs-resp-2)*h).toISOString():'',updatedAt:new Date(now-hrs*h).toISOString(),resolution:st==='resolved'?'تم استبدال نقطة الوصول اللاسلكية':'',test:{download:6.2,upload:3.1,ping:48}});
+  const mk=(n,hrs,b,type,st,name,desc,resp)=>({id:'NP-'+n,createdAt:new Date(now-hrs*h).toISOString(),email:'demo.user@sr.edu.sa',name,department:'كلية الطب',building:b,spot:'',issueType:type,connection:'Wi-Fi',occurredAt:new Date(now-hrs*h).toISOString(),description:desc,status:st,priority:type==='انقطاع كامل'?'high':'medium',mobile:'+96650000'+String(1000+n).slice(-4),assignee:st==='open'?'':'فريق الشبكات',firstResponseAt:resp?new Date(now-(hrs-resp)*h).toISOString():'',resolvedAt:st==='resolved'?new Date(now-(hrs-resp-2)*h).toISOString():'',updatedAt:new Date(now-hrs*h).toISOString(),resolution:st==='resolved'?'تم استبدال نقطة الوصول اللاسلكية':'',test:{download:6.2,upload:3.1,ping:48}});
   const tickets=[];
   const types=['بطء الإنترنت','انقطاع متقطع','ضعف إشارة Wi-Fi','انقطاع كامل'];
   for(let i=0;i<34;i++){ const hrs=6+i*19; tickets.push(mk(1010+i,hrs,L[i%L.length],types[i%4],i<4?(['open','review','progress','open'][i]):(i%7===0?'closed':'resolved'),['أحمد عبدالله','سارة محمد','خالد علي','نورة سعد'][i%4],'يوجد بطء ملحوظ في تصفح الإنترنت ويؤثر على استخدام الأنظمة التعليمية.',0.3+i%3*0.4)); }
@@ -794,6 +839,7 @@ function demoDB(){
     L, seq:1043};
   demoSave(db); return db;
 }
+function demoNorm(v){ let s=String(v).replace(/[\s\-().]/g,'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)); if(/^00/.test(s)) s='+'+s.slice(2); const m=s.match(/^(?:\+?966|0)?(5\d{8})$/); return m?'+966'+m[1]:s; }
 function demoSave(db){ try{ localStorage.setItem('np_demo',JSON.stringify(db)); }catch(e){} }
 function demoStatus(db){
   const now=Date.now();
@@ -811,13 +857,15 @@ async function demoApi(action,p){
   const db=demoDB(); const u=S.user||{email:'demo.user@sr.edu.sa'};
   const mine=()=>db.tickets.filter(t=>t.email===u.email).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   switch(action){
-    case 'login': { const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user'}; S.user=user;
+    case 'login': { const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user',mobile:db.mobile||''}; S.user=user;
       return {ok:true,user,locations:db.L.map(b=>({building:b,college:''})),buildings:demoStatus(db),tickets:db.tickets.filter(t=>t.email===user.email)}; }
+    case 'saveProfile': { if(!mobileOk(p.data.mobile)) throw new Error(ERR_AR.BAD_MOBILE); db.mobile=demoNorm(p.data.mobile); demoSave(db); return {ok:true,mobile:db.mobile}; }
     case 'getStatus': return {ok:true,buildings:demoStatus(db)};
     case 'saveSpeedTest': db.tests.unshift({at:new Date().toISOString(),building:p.data.building,down:p.data.download,up:p.data.upload,ping:p.data.ping}); demoSave(db); return {ok:true};
     case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||(d.description||'').length<5) throw new Error(ERR_AR.MISSING_FIELDS);
       const id='NP-'+(++db.seq); const now=new Date().toISOString();
-      db.tickets.unshift({id,createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test});
+      if(!mobileOk(d.mobile)) throw new Error(ERR_AR.BAD_MOBILE); if(!db.mobile) db.mobile=demoNorm(d.mobile);
+      db.tickets.unshift({id,mobile:demoNorm(d.mobile),createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test});
       db.log.push({at:now,ticketId:id,action:'created',status:'open',note:'',by:u.email}); demoSave(db); return {ok:true,ticketId:id}; }
     case 'myTickets': return {ok:true,tickets:mine()};
     case 'getTicket': { const t=db.tickets.find(x=>x.id===p.ticketId); if(!t) throw new Error(ERR_AR.NOT_FOUND); return {ok:true,ticket:t,log:db.log.filter(l=>l.ticketId===t.id)}; }

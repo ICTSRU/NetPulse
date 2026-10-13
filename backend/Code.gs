@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.9  (2026-10-13)
+ *  Version: 2.0  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -30,7 +30,7 @@
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.9' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '2.0' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -38,9 +38,10 @@ const SHEETS = {
   LOCS:     { name: 'Locations',     headers: ['Building', 'College', 'Active', 'SortOrder'] },
   NETSTAT:  { name: 'NetworkStatus', headers: ['Building', 'Status', 'Source', 'Note', 'UpdatedAt', 'UpdatedBy'] },
   TESTS:    { name: 'SpeedTests',    headers: ['Timestamp', 'Email', 'Building', 'DownloadMbps', 'UploadMbps', 'PingMs', 'JitterMs', 'Connection', 'Server', 'Client'] },
-  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount'] },
+  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount', 'AssigneeEmail'] },
   LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] },
   FEEDBACK: { name: 'Feedback',      headers: ['Timestamp', 'TicketId', 'Email', 'Answer', 'Note', 'Building', 'IssueType', 'Cycle'] },
+  TEAM:     { name: 'Team',          headers: ['Name', 'Title', 'Unit', 'Email', 'Active', 'SortOrder'] },
   WEEKLY:   { name: 'WeeklyKPIs',    headers: ['WeekStart', 'WeekEnd', 'NewTickets', 'Resolved', 'OpenAtEnd', 'SatisfactionPct', 'ResponseRatePct', 'Answers', 'AvgFirstResponseMin', 'AvgResolveHours', 'Reopened', 'ReopenPct', 'AutoClosed', 'TopBuilding', 'TopIssue', 'SpeedTests', 'MedianDownMbps', 'SentTo', 'SentAt'] }
 };
 
@@ -190,8 +191,21 @@ function roleOf_(email) {
   const admins = (prop_('ADMIN_EMAILS') || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   if (admins.indexOf(email) > -1) return 'admin';
   const u = userRow_(email);
-  if (u && String(u.Active).toLowerCase() !== 'false' && ROLES.indexOf(String(u.Role)) > -1) return String(u.Role);
+  const active = u && String(u.Active).toLowerCase() !== 'false';
+  if (active && (u.Role === 'admin' || u.Role === 'tech')) return String(u.Role);
+  if (u && !active) return 'user';
+  // Members of the ICTD team list (Team tab) automatically get the tech-team role
+  if (team_().some(m => m.email === email)) return 'tech';
   return 'user';
+}
+
+/** ICTD team list for the «المسؤول» dropdown — edit the Team tab to change it. */
+function team_() {
+  return readAll_(SHEETS.TEAM)
+    .filter(r => r.Name && String(r.Active).toLowerCase() !== 'false')
+    .sort((a, b) => (Number(a.SortOrder) || 99) - (Number(b.SortOrder) || 99))
+    .map(r => ({ name: String(r.Name), title: String(r.Title || ''), unit: String(r.Unit || ''),
+                 email: String(r.Email || '').toLowerCase().replace(/^—$/, '') }));
 }
 
 function requireRole_(user, roles) {
@@ -218,7 +232,8 @@ function login_(user, body) {
       .sort((a, b) => (Number(a.SortOrder) || 99) - (Number(b.SortOrder) || 99))
       .map(r => ({ building: String(r.Building), college: String(r.College || '') })),
     buildings: buildingStatus_(),
-    tickets: myTickets_(user)
+    tickets: myTickets_(user),
+    team: (user.role === 'tech' || user.role === 'admin') ? team_() : []
   };
 }
 
@@ -308,7 +323,7 @@ function teamData_() {
   const feedback = readAll_(SHEETS.FEEDBACK)
     .filter(r => r.Timestamp && new Date(r.Timestamp).getTime() >= since)
     .map(r => ({ at: iso_(r.Timestamp), ticketId: r.TicketId, answer: r.Answer, note: r.Note, building: r.Building, issueType: r.IssueType }));
-  return { ok: true, tickets: tickets, tests: tests, feedback: feedback, buildings: buildingStatus_() };
+  return { ok: true, tickets: tickets, tests: tests, feedback: feedback, team: team_(), buildings: buildingStatus_() };
 }
 
 function updateTicket_(user, d) {
@@ -326,7 +341,12 @@ function updateTicket_(user, d) {
   const prevStatus = row[c('Status')];
   if (d.status) row[c('Status')] = d.status;
   if (d.priority) row[c('Priority')] = d.priority;
-  if (d.assignee !== undefined) row[c('Assignee')] = clean_(d.assignee, 120);
+  const prevAssignee = row[c('Assignee')];
+  if (d.assignee !== undefined) {
+    row[c('Assignee')] = clean_(d.assignee, 120);
+    const m = team_().find(x => x.name === row[c('Assignee')]);
+    row[c('AssigneeEmail')] = m && m.email ? m.email : '';
+  }
   if (d.resolution !== undefined) row[c('Resolution')] = clean_(d.resolution, 500);
   if (!row[c('FirstResponseAt')] && d.status && d.status !== 'open') row[c('FirstResponseAt')] = now;
   if ((d.status === 'resolved' || d.status === 'closed') && !row[c('ResolvedAt')]) row[c('ResolvedAt')] = now;
@@ -337,6 +357,9 @@ function updateTicket_(user, d) {
   const note = clean_(d.note, 500);
   appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: d.ticketId, Action: 'updated', Status: row[c('Status')], Note: note, By: user.email });
 
+  if (row[c('Assignee')] && row[c('Assignee')] !== prevAssignee && row[c('AssigneeEmail')] && row[c('AssigneeEmail')] !== user.email) {
+    notifyAssignee_(row[c('AssigneeEmail')], row[c('Assignee')], user, row, c);
+  }
   if (d.status && d.status !== prevStatus) {
     notifyReporter_(row[c('Email')], d.ticketId, row[c('Status')], note || row[c('Resolution')]);
   } else if (note) {
@@ -609,6 +632,26 @@ function notifyReopen_(id, user, building, issueType, note, assignee) {
     }), 'أُعيد فتح البلاغ ' + id);
 }
 
+function notifyAssignee_(email, name, by, row, c) {
+  const id = row[c('TicketId')];
+  sendMail_(email, '[NetPulse] أُسند إليك البلاغ ' + id + ' — ' + row[c('Building')],
+    mailShell_({
+      preheader: 'أُسند إليك البلاغ ' + id + ' بواسطة ' + by.name,
+      title: 'أُسند إليك بلاغ',
+      intro: 'مرحبًا ' + esc_(name) + '، أسند إليك ' + esc_(by.name) + ' البلاغ التالي للمتابعة.',
+      steps: row[c('Status')],
+      rows: [
+        ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+        ['الأولوية', esc_(({ low: 'منخفضة', medium: 'متوسطة', high: 'عالية', critical: 'حرجة' })[row[c('Priority')]] || row[c('Priority')])],
+        ['الموقع', esc_(row[c('Building')]) + (row[c('Spot')] ? ' — ' + esc_(row[c('Spot')]) : '')],
+        ['نوع المشكلة', esc_(row[c('IssueType')])],
+        ['المُبلِّغ', esc_(row[c('Name')]) + ' — <a href="tel:' + esc_(String(row[c('Mobile')]).replace(/^'/, '')) + '" dir="ltr" style="color:#0a6eaa;text-decoration:none">' + esc_(String(row[c('Mobile')]).replace(/^'/, '')) + '</a>'],
+        ['الوصف', esc_(row[c('Description')])]
+      ],
+      button: { text: 'فتح البلاغ ومعالجته', url: ticketUrl_(id) }
+    }), 'أُسند إليك البلاغ ' + id);
+}
+
 function notifyReply_(email, id, status, note) {
   sendMail_(email, 'رد جديد على بلاغك ' + id + ' — نبض الشبكة',
     mailShell_({
@@ -796,6 +839,26 @@ function mailShell_(o) {
 
 function setup() {
   Object.keys(SHEETS).forEach(k => sheet_(SHEETS[k]));
+  const team = sheet_(SHEETS.TEAM);
+  if (team.getLastRow() < 2) {
+    const t = [
+      ['Dr. Nasser Abounar', 'الرئيس التنفيذي', 'ICTD', 'nabounar@sr.edu.sa', true, 1],
+      ['Mohamed ElMahdy', 'مدير التشغيل', 'ITOC', 'm.elmahdy@sr.edu.sa', true, 2],
+      ['Mohamed Nawaz', 'مدير الشبكات والأمن السيبراني', 'NOC', 'n.nawaz@sr.edu.sa', true, 3],
+      ['Mohamed Omar', 'مدير مركز الدعم والخدمات الرقمية', 'DSSC', 'm.omar@sr.edu.sa', true, 4],
+      ['Mohamed Saleh', 'مطور تطبيقات', 'AAU', 'm.saleh@sr.edu.sa', true, 5],
+      ['Ammar Alrowedan', 'مسئول الدعم الفني - التعليم الألكتروني', 'DSSC', 'a.alrowedan@sr.edu.sa', true, 6],
+      ['Nayed Alrashidi', 'مسئول الدعم الفني', 'DSSC', 'n.alrashidi@sr.edu.sa', true, 7],
+      ['Abd Alazez Alawaji', 'مسئول الدعم الفني', 'DSSC', 'a.alawaji@sr.edu.sa', true, 8],
+      ['Azzam Alaqeel', 'مسئول الدعم الفني - الصوتيات والمرئيات', 'DSSC', 'a.alaqeel@sr.edu.sa', true, 9],
+      ['Asma Alolayan', 'مسئول الدعم الفني - شطر الطالبات', 'DSSC', 'a.alolayan@sr.edu.sa', true, 10],
+      ['Shath Albusyli', 'مسئول الدعم الفني - شطر الطالبات', 'DSSC', 's.albusayli@sr.edu.sa', true, 11],
+      ['Inshrah Almutairi', 'مسئول الدعم الفني - شطر الطالبات', 'DSSC', 'i.almutairi@sr.edu.sa', true, 12],
+      ['عاطف النادي', 'مسئول الشبكات', 'NOC', 'a.elnadi@sr.edu.sa', true, 13],
+      ['سراج', 'فني صوتيات ومرئيات', 'DSSC', '', true, 14]
+    ];
+    team.getRange(2, 1, t.length, 6).setValues(t);
+  }
   const locs = sheet_(SHEETS.LOCS);
   if (locs.getLastRow() < 2) {
     // Seed buildings — EDIT this tab to match SRU's real buildings/zones.

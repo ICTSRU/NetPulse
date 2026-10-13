@@ -276,12 +276,12 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v1.9
+ * SRU NetPulse — Frontend v2.0
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '1.9',
+  VERSION: '2.0',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
@@ -401,7 +401,7 @@ function signOut(expired){
 }
 
 function startApp(out){
-  S.user = out.user; S.locations = out.locations; S.buildings = out.buildings; S.tickets = out.tickets || [];
+  S.user = out.user; S.locations = out.locations; S.buildings = out.buildings; S.tickets = out.tickets || []; S.teamList = out.team || [];
   $('#signin').classList.add('hidden'); $('#app').classList.remove('hidden');
   $('#demoBanner').classList.toggle('hidden', !DEMO);
   $('#uName').textContent = S.user.name;
@@ -770,12 +770,27 @@ function updateForm(t){
     <input type="hidden" id="us" value="${esc(t.status)}">
     <div class="grid g2" style="margin-top:12px">
       <div class="field"><label class="f" for="up">الأولوية</label><select id="up">${Object.keys(PRIO).map(k=>`<option value="${k}" ${k===t.priority?'selected':''}>${PRIO[k][0]}</option>`).join('')}</select></div>
-      <div class="field"><label class="f" for="ua">المسؤول</label><div class="row" style="flex-wrap:nowrap"><input type="text" id="ua" value="${esc(t.assignee||'')}" placeholder="اسم الفني المسؤول"><button type="button" class="btn sec sm" onclick="$('#ua').value=S.user.name">تعيين لي</button></div></div>
+      <div class="field"><label class="f" for="ua">المسؤول</label><div class="row" style="flex-wrap:nowrap"><select id="ua">${assigneeOptions(t.assignee)}</select><button type="button" class="btn sec sm" onclick="assignMe()">تعيين لي</button></div><div class="hint">يصل المسؤول بريد «أُسند إليك بلاغ» عند التعيين.</div></div>
     </div>
     <div class="field"><label class="f" for="un">الرد على المُبلِّغ <span class="hint">(يُرسل له بالبريد ويظهر في سجل المعالجة)</span></label><textarea id="un" maxlength="500" style="min-height:70px" placeholder="مثال: تم رصد المشكلة وجارٍ العمل عليها، نتوقع الحل خلال ساعتين."></textarea></div>
     <div class="field" id="resWrap"><label class="f" for="ur">الإجراء المتخذ / الحل <span id="resReq" class="hint"></span></label><textarea id="ur" maxlength="500" style="min-height:60px">${esc(t.resolution||'')}</textarea></div>
     <div class="hint" id="saveHint" style="margin-bottom:8px"></div>
     <button class="btn block" id="saveBtn"><i data-lucide="save"></i>حفظ وإرسال</button></form>`;
+}
+function assigneeOptions(cur){
+  const list = S.teamList || [];
+  const units = [...new Set(list.map(m=>m.unit||'أخرى'))];
+  let h = `<option value="">— غير مُسند —</option>`;
+  if (cur && !list.some(m=>m.name===cur)) h += `<option selected>${esc(cur)}</option>`;
+  units.forEach(u => {
+    h += `<optgroup label="${esc(u)}">` + list.filter(m=>(m.unit||'أخرى')===u).map(m=>`<option value="${esc(m.name)}" ${m.name===cur?'selected':''}>${esc(m.name)} — ${esc(m.title)}</option>`).join('') + `</optgroup>`;
+  });
+  return h;
+}
+function assignMe(){
+  const me = (S.teamList||[]).find(m=>m.email && m.email===S.user.email);
+  if (!me) { toast('بريدك غير موجود في قائمة الفريق (تبويب Team).'); return; }
+  $('#ua').value = me.name;
 }
 function pickStatus(st){
   $('#us').value = st;
@@ -804,7 +819,7 @@ function drawStatus(){ const el=$('#blist'); if(!el) return; el.innerHTML = S.bu
 async function refreshStatus(silent){ try { S.buildings=(await api('getStatus')).buildings; drawStatus(); if(!silent) toast('تم التحديث'); } catch(e){ if(!silent) toast(e.message); } }
 
 /* ----- Team dashboard (tech/admin) ----- */
-async function loadTeam(){ S.team = await api('teamData'); S.buildings = S.team.buildings; return S.team; }
+async function loadTeam(){ S.team = await api('teamData'); S.buildings = S.team.buildings; if (S.team.team && S.team.team.length) S.teamList = S.team.team; return S.team; }
 async function vTeam(){
   $('#main').innerHTML = `${head('bar-chart-3','لوحة متابعة الفريق الفني','مراقبة البلاغات وحالة الشبكة في جميع مباني الجامعة.')}<div class="empty">جارٍ التحميل…</div>`;
   let d; try { d = await loadTeam(); } catch(e){ $('#main').innerHTML += `<div class="alert c-bad">${esc(e.message)}</div>`; return; }
@@ -869,14 +884,16 @@ async function vTickets(){
     <input type="search" id="fq" placeholder="بحث برقم البلاغ أو الاسم أو الوصف…" style="flex:2;min-width:200px" oninput="filterTickets()">
     <select id="fs" style="flex:1;min-width:140px" onchange="filterTickets()"><option value="active">المفتوحة (كل المراحل)</option><option value="">كل الحالات</option>${Object.keys(T_STATUS).map(k=>`<option value="${k}">${T_STATUS[k][0]}</option>`).join('')}</select>
     <select id="fb" style="flex:1;min-width:140px" onchange="filterTickets()"><option value="">كل المباني</option>${S.locations.map(l=>`<option>${esc(l.building)}</option>`).join('')}</select>
+    <select id="fa" style="flex:1;min-width:150px" onchange="filterTickets()"><option value="">كل المسؤولين</option><option value="__me">المسندة إليّ</option><option value="__none">غير مُسندة</option>${(S.teamList||[]).map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('')}</select>
     <button class="btn sec sm" onclick="exportCSV()"><i data-lucide="download"></i>تصدير CSV</button>
   </div><div id="tbl"><div class="empty">جارٍ التحميل…</div></div></div>`;
   icons();
   try { await loadTeam(); filterTickets(); } catch(e){ $('#tbl').innerHTML=`<div class="alert c-bad">${esc(e.message)}</div>`; }
 }
 function currentFiltered(){
-  const q=($('#fq').value||'').trim().toLowerCase(), s=$('#fs').value, b=$('#fb').value;
-  return S.team.tickets.filter(t=>(s==='active'?['open','review','progress'].includes(t.status):(!s||t.status===s)) && (!b||t.building===b) &&
+  const q=($('#fq').value||'').trim().toLowerCase(), s=$('#fs').value, b=$('#fb').value, a=$('#fa').value;
+  const me=((S.teamList||[]).find(m=>m.email===S.user.email)||{}).name;
+  return S.team.tickets.filter(t=>(s==='active'?['open','review','progress'].includes(t.status):(!s||t.status===s)) && (!b||t.building===b) && (!a || (a==='__none'?!t.assignee : a==='__me'?(me&&t.assignee===me) : t.assignee===a)) &&
     (!q||[t.id,t.name,t.email,t.description,t.issueType,t.spot].join(' ').toLowerCase().includes(q)));
 }
 function filterTickets(){ const l=currentFiltered(); $('#tbl').innerHTML = l.length? ticketTable(l,true) : '<div class="empty"><i data-lucide="inbox"></i>لا توجد نتائج</div>'; icons(); }
@@ -954,8 +971,9 @@ async function demoApi(action,p){
   const db=demoDB(); const u=S.user||{email:'demo.user@sr.edu.sa'};
   const mine=()=>db.tickets.filter(t=>t.email===u.email).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   switch(action){
-    case 'login': { const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user',mobile:db.mobile||''}; S.user=user;
-      return {ok:true,user,locations:db.L.map(b=>({building:b,college:''})),buildings:demoStatus(db),tickets:db.tickets.filter(t=>t.email===user.email)}; }
+    case 'login': { const team=[['Dr. Nasser Abounar','الرئيس التنفيذي','ICTD'],['Mohamed ElMahdy','مدير التشغيل','ITOC','demo.user@sr.edu.sa'],['Mohamed Nawaz','مدير الشبكات والأمن السيبراني','NOC'],['عاطف النادي','مسئول الشبكات','NOC'],['Mohamed Omar','مدير مركز الدعم والخدمات الرقمية','DSSC'],['Nayed Alrashidi','مسئول الدعم الفني','DSSC'],['سراج','فني صوتيات ومرئيات','DSSC']].map(x=>({name:x[0],title:x[1],unit:x[2],email:x[3]||''}));
+      const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user',mobile:db.mobile||''}; S.user=user;
+      return {ok:true,user,team:p.role==='tech'?team:[],locations:db.L.map(b=>({building:b,college:''})),buildings:demoStatus(db),tickets:db.tickets.filter(t=>t.email===user.email)}; }
     case 'saveProfile': { if(!mobileOk(p.data.mobile)) throw new Error(ERR_AR.BAD_MOBILE); db.mobile=demoNorm(p.data.mobile); demoSave(db); return {ok:true,mobile:db.mobile,name:p.data.name}; }
     case 'getStatus': return {ok:true,buildings:demoStatus(db)};
     case 'saveSpeedTest': db.tests.unshift({at:new Date().toISOString(),building:p.data.building,down:p.data.download,up:p.data.upload,ping:p.data.ping}); demoSave(db); return {ok:true};

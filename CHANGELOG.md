@@ -1,5 +1,14 @@
 # Changelog — SRU NetPulse
 
+## v2.0 — 2026-10-13
+### Added
+- **«المسؤول» is now a dropdown** of the ICTD team, grouped by unit (ICTD / ITOC / NOC / DSSC / AAU), showing name — title; «— غير مُسند —» option; «تعيين لي» picks your own entry.
+- New `Team` tab (Name, Title, Unit, Email, Active, SortOrder) seeded by `setup` with the 14-member ICTD list; edit the tab to add, remove (Active = FALSE) or reorder people — no code change.
+- Team members are **automatically given the tech-team role** (access to لوحة الفريق الفني / إدارة البلاغات); an explicit `Users` role still takes priority.
+- **Assignment e-mail** «أُسند إليك بلاغ» to the assignee (location, priority, reporter + tap-to-call mobile, description, button to open the ticket).
+- Ticket list filter by assignee: كل المسؤولين / المسندة إليّ / غير مُسندة / each member.
+- `Tickets` column `AssigneeEmail` (added automatically).
+
 ## v1.9 — 2026-10-13
 ### Added
 - **Weekly KPI report** (`sendWeeklyReport`, trigger every Sunday 07:00 Riyadh, installed by `setup`) to `REPORT_EMAILS` (default m.elmahdy@sr.edu.sa): new/resolved/open/auto-closed tiles with week-over-week change; KPI table vs targets (satisfaction, first response, resolution time, reopen %, survey response rate) marked محقق / غير محقق; top buildings with bars; issue-type mix; reopened tickets; user speed-test median; CSV of the week's tickets attached.

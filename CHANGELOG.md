@@ -1,5 +1,13 @@
 # Changelog — SRU NetPulse
 
+## v1.7 — 2026-10-13
+### Changed
+- **Redesigned e-mails** (reporter confirmation, status update, resolved, NOC alert): branded header with the «نبض الشبكة» logo, progress tracker (مفتوح → قيد المراجعة → قيد المعالجة → تم الحل), coloured status badge, details table, call-to-action button and ITOC footer. Table-based layout for Outlook/Gmail; sender name «نبض الشبكة — SRU NetPulse»; no-reply.
+- NOC alert now shows reporter, tap-to-call mobile, department, location, attached speed test and suggested priority.
+### Added
+- **Link in every e-mail** — opens the ticket directly (`/exec?ticket=NP-1001`); the platform opens that ticket after sign-in. Optional Script property `APP_URL` overrides the link.
+- `backend/Brand.gs` — logo images embedded for e-mails (inline cid images, no external hosting).
+
 ## v1.6 — 2026-10-13
 ### Added
 - **No-Client-ID mode (default):** the platform page is served directly by Apps Script (`doGet` → `backend/Index.html`); Google signs the user in and `Session.getActiveUser()` identifies them. No Google Cloud project or OAuth Client ID is needed.

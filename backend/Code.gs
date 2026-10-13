@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.6  (2026-10-13)
+ *  Version: 1.7  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -20,12 +20,13 @@
  *    MONITOR_KEY     (optional) shared secret for the monitoring push endpoint
  *    STALE_HOURS     (optional) hours before a monitoring status is considered stale (default 6)
  *    SEND_EMAILS     (optional) "false" to disable all e-mails (default true)
+ *    APP_URL         (optional) link used in e-mails; default = this Web App's /exec URL
  *
  *  First run: select function `setup` → Run (creates all tabs + seed data).
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.6' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '1.7' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -393,49 +394,156 @@ function buildingStatus_() {
   });
 }
 
-/* ---------------- Notifications ---------------- */
+/* ---------------- Notifications (v1.7 branded e-mails) ---------------- */
 
-function notifyNewTicket_(id, user, d, desc) {
-  if (prop_('SEND_EMAILS') === 'false') return;
+const STATUS_STYLE = {
+  open:     { bg: '#fdecec', fg: '#c62828' },
+  review:   { bg: '#e6f3fa', fg: '#0a6eaa' },
+  progress: { bg: '#fff4e0', fg: '#a35f00' },
+  resolved: { bg: '#e7f6ee', fg: '#1a7a43' },
+  closed:   { bg: '#f0eef4', fg: '#5f5872' }
+};
+
+function appUrl_() {
+  return prop_('APP_URL') || ScriptApp.getService().getUrl() || '';
+}
+function ticketUrl_(id) {
+  const u = appUrl_();
+  return u ? u + (u.indexOf('?') > -1 ? '&' : '?') + 'ticket=' + encodeURIComponent(id) : '';
+}
+function fmtDate_(d) {
+  return d ? Utilities.formatDate(new Date(d), 'Asia/Riyadh', 'yyyy/MM/dd — hh:mm a').replace('AM', 'ص').replace('PM', 'م') : '—';
+}
+
+function sendMail_(to, subject, html, preheader) {
+  if (prop_('SEND_EMAILS') === 'false' || !to) return;
   try {
     MailApp.sendEmail({
-      to: user.email,
-      subject: 'تم استلام بلاغك ' + id + ' — نبض الشبكة',
-      htmlBody: mailShell_('تم استلام بلاغك',
-        '<p>شكرًا لك، تم استلام بلاغك وتحويله إلى الفريق الفني.</p>' +
-        '<p><b>رقم البلاغ:</b> ' + id + '<br><b>الموقع:</b> ' + esc_(d.building) + '<br><b>نوع المشكلة:</b> ' + esc_(d.issueType) + '</p>' +
-        '<p>يمكنك متابعة حالة البلاغ من صفحة «متابعة البلاغات» في المنصة.</p>')
+      to: to, subject: subject, name: 'نبض الشبكة — SRU NetPulse',
+      noReply: true, htmlBody: html, inlineImages: brandBlobs_(),
+      body: preheader + '\n' + appUrl_()
     });
-    const noc = prop_('NOTIFY_EMAIL');
-    if (noc) MailApp.sendEmail({
-      to: noc,
-      subject: '[NetPulse] بلاغ جديد ' + id + ' — ' + d.building + ' — ' + d.issueType,
-      htmlBody: mailShell_('بلاغ جديد ' + id,
-        '<p><b>المُبلِّغ:</b> ' + esc_(user.name) + ' (' + esc_(user.email) + ')<br><b>الجوال:</b> <span dir="ltr">' + esc_(d.mobile) + '</span><br><b>الموقع:</b> ' + esc_(d.building) + ' — ' + esc_(d.spot || '') +
-        '<br><b>نوع المشكلة:</b> ' + esc_(d.issueType) + '<br><b>الوصف:</b> ' + esc_(desc) +
-        (d.test ? '<br><b>آخر قياس:</b> ' + num_(d.test.download) + ' / ' + num_(d.test.upload) + ' Mbps — ' + num_(d.test.ping) + ' ms' : '') + '</p>')
-    });
-  } catch (e) { console.warn('mail failed', e); }
+  } catch (e) {
+    // noReply is only allowed for Google Workspace accounts — retry without it
+    try { MailApp.sendEmail({ to: to, subject: subject, name: 'نبض الشبكة — SRU NetPulse', htmlBody: html, inlineImages: brandBlobs_(), body: preheader }); }
+    catch (e2) { console.warn('mail failed', e2); }
+  }
+}
+
+function notifyNewTicket_(id, user, d, desc) {
+  const rows = [
+    ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+    ['الحالة', badge_('open')],
+    ['الموقع', esc_(d.building) + (d.spot ? ' — ' + esc_(d.spot) : '')],
+    ['نوع المشكلة', esc_(d.issueType)],
+    ['وقت البلاغ', fmtDate_(new Date())],
+    ['الوصف', esc_(desc)]
+  ];
+  sendMail_(user.email, 'تم استلام بلاغك ' + id + ' — نبض الشبكة',
+    mailShell_({
+      preheader: 'تم استلام بلاغك ' + id + ' وتحويله إلى الفريق الفني.',
+      title: 'تم استلام بلاغك',
+      intro: 'مرحبًا ' + esc_(user.name) + '، شكرًا لك. تم استلام بلاغك وتحويله إلى الفريق الفني، وسنوافيك بأي تحديث على حالته.',
+      steps: 'open', rows: rows,
+      button: { text: 'متابعة البلاغ', url: ticketUrl_(id) },
+      note: 'لتسريع المعالجة، يمكنك إجراء قياس للسرعة من المنصة وإرفاقه بالبلاغ.'
+    }), 'تم استلام بلاغك ' + id);
+
+  const noc = prop_('NOTIFY_EMAIL');
+  if (noc) {
+    const t = d.test ? num_(d.test.download) + ' ↓ / ' + num_(d.test.upload) + ' ↑ Mbps · ' + num_(d.test.ping) + ' ms' : 'لم يُرفق قياس';
+    sendMail_(noc, '[NetPulse] بلاغ جديد ' + id + ' — ' + d.building + ' — ' + d.issueType,
+      mailShell_({
+        preheader: 'بلاغ جديد ' + id + ' في ' + d.building,
+        title: 'بلاغ جديد يحتاج متابعة',
+        intro: 'وصل بلاغ جديد إلى منصة نبض الشبكة. الأولوية المقترحة: <b>' + (suggestPriority_(d) === 'high' ? 'عالية' : 'متوسطة') + '</b>.',
+        steps: 'open',
+        rows: [
+          ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+          ['المُبلِّغ', esc_(user.name) + '<br><span style="color:#6b5a80" dir="ltr">' + esc_(user.email) + '</span>'],
+          ['الجوال', '<a href="tel:' + esc_(d.mobile) + '" style="color:#0a6eaa;text-decoration:none" dir="ltr">' + esc_(d.mobile) + '</a>'],
+          ['الجهة', esc_(d.department || '—')],
+          ['الموقع', esc_(d.building) + (d.spot ? ' — ' + esc_(d.spot) : '')],
+          ['نوع المشكلة', esc_(d.issueType) + ' <span style="color:#6b5a80">(' + esc_(d.connection || '') + ')</span>'],
+          ['آخر قياس', '<span dir="ltr">' + esc_(t) + '</span>'],
+          ['الوصف', esc_(desc)]
+        ],
+        button: { text: 'فتح البلاغ في المنصة', url: ticketUrl_(id) }
+      }), 'بلاغ جديد ' + id);
+  }
 }
 
 function notifyReporter_(email, id, status, note) {
-  if (prop_('SEND_EMAILS') === 'false' || !email) return;
-  try {
-    MailApp.sendEmail({
-      to: email,
-      subject: 'تحديث على بلاغك ' + id + ': ' + (STATUS_AR[status] || status),
-      htmlBody: mailShell_('تحديث على بلاغك ' + id,
-        '<p>تم تحديث حالة بلاغك إلى: <b>' + (STATUS_AR[status] || status) + '</b></p>' +
-        (note ? '<p><b>ملاحظة الفريق الفني:</b> ' + esc_(note) + '</p>' : ''))
-    });
-  } catch (e) { console.warn('mail failed', e); }
+  const done = status === 'resolved' || status === 'closed';
+  sendMail_(email, (done ? 'تم حل بلاغك ' : 'تحديث على بلاغك ') + id + ': ' + (STATUS_AR[status] || status),
+    mailShell_({
+      preheader: 'حالة بلاغك ' + id + ' الآن: ' + (STATUS_AR[status] || status),
+      title: done ? 'تم حل بلاغك ✓' : 'تحديث على بلاغك',
+      intro: done ? 'يسعدنا إبلاغك بأن الفريق الفني أنهى معالجة بلاغك. إن استمرت المشكلة يمكنك إرسال بلاغ جديد من المنصة.'
+                  : 'قام الفريق الفني بتحديث حالة بلاغك.',
+      steps: status,
+      rows: [
+        ['رقم البلاغ', '<b style="font-size:16px;color:#501e8c">' + esc_(id) + '</b>'],
+        ['الحالة الحالية', badge_(status)],
+        ['وقت التحديث', fmtDate_(new Date())]
+      ].concat(note ? [['ملاحظة الفريق الفني', esc_(note)]] : []),
+      button: { text: 'عرض تفاصيل البلاغ', url: ticketUrl_(id) }
+    }), 'تحديث على بلاغك ' + id);
 }
 
-function mailShell_(title, inner) {
-  return '<div dir="rtl" style="font-family:Tahoma,Arial;color:#241436;max-width:560px">' +
-    '<div style="background:#501e8c;color:#fff;padding:14px 18px;font-weight:bold">نبض الشبكة — SRU NetPulse</div>' +
-    '<div style="padding:18px;border:1px solid #e5dcf3;border-top:0"><h3 style="margin-top:0">' + esc_(title) + '</h3>' + inner +
-    '<p style="color:#6b5a80;font-size:12px;margin-top:24px">الإدارة التنفيذية للاتصالات وتقنية المعلومات — مركز عمليات تقنية المعلومات (ITOC)</p></div></div>';
+function badge_(st) {
+  const c = STATUS_STYLE[st] || STATUS_STYLE.closed;
+  return '<span style="display:inline-block;background:' + c.bg + ';color:' + c.fg + ';font-weight:bold;font-size:13px;padding:3px 12px;border-radius:12px">' + (STATUS_AR[st] || st) + '</span>';
+}
+
+/** Progress tracker: مفتوح → قيد المراجعة → قيد المعالجة → تم الحل */
+function steps_(st) {
+  const order = ['open', 'review', 'progress', 'resolved'];
+  const idx = st === 'closed' ? 3 : Math.max(0, order.indexOf(st));
+  return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 6px"><tr>' +
+    order.map((k, i) => {
+      const on = i <= idx;
+      return '<td width="25%" align="center" style="padding:0 3px;font-family:Tahoma,Arial,sans-serif">' +
+        '<div style="height:6px;border-radius:3px;background:' + (on ? '#501e8c' : '#e4dcef') + '"></div>' +
+        '<div style="font-size:12px;padding-top:6px;color:' + (on ? '#501e8c' : '#9a90aa') + ';font-weight:' + (i === idx ? 'bold' : 'normal') + '">' + STATUS_AR[k] + '</div></td>';
+    }).join('') + '</tr></table>';
+}
+
+function mailShell_(o) {
+  const rows = (o.rows || []).map((r, i) =>
+    '<tr><td width="120" valign="top" style="padding:10px 14px;background:' + (i % 2 ? '#ffffff' : '#faf8fd') + ';color:#6b5a80;font-size:13px;font-family:Tahoma,Arial,sans-serif;border-bottom:1px solid #eee8f5">' + r[0] + '</td>' +
+    '<td valign="top" style="padding:10px 14px;background:' + (i % 2 ? '#ffffff' : '#faf8fd') + ';color:#241436;font-size:14px;line-height:1.7;font-family:Tahoma,Arial,sans-serif;border-bottom:1px solid #eee8f5">' + r[1] + '</td></tr>').join('');
+  const btn = o.button && o.button.url ?
+    '<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto 8px"><tr><td align="center" bgcolor="#501e8c" style="border-radius:6px">' +
+    '<a href="' + o.button.url + '" target="_blank" style="display:inline-block;padding:13px 36px;font-family:Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px">' + o.button.text + ' ←</a></td></tr></table>' +
+    '<div style="text-align:center;font-size:11px;color:#9a90aa;font-family:Tahoma,Arial,sans-serif">أو انسخ الرابط: <a href="' + o.button.url + '" style="color:#0a6eaa;word-break:break-all" dir="ltr">' + o.button.url + '</a></div>' : '';
+  return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+    '<body style="margin:0;padding:0;background:#f3eff9" dir="rtl">' +
+    '<div style="display:none;max-height:0;overflow:hidden;opacity:0">' + esc_(o.preheader || '') + '</div>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f3eff9"><tr><td align="center" style="padding:24px 12px">' +
+    '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e4dcef" dir="rtl">' +
+    // header
+    '<tr><td bgcolor="#3a1464" style="background:#3a1464;padding:22px 26px" align="right">' +
+      '<img src="cid:nplogo" width="210" alt="نبض الشبكة — SRU NetPulse" style="display:block;border:0;width:210px;height:auto"></td></tr>' +
+    '<tr><td style="height:4px;background:#1ba3d6;font-size:0;line-height:0">&nbsp;</td></tr>' +
+    // body
+    '<tr><td style="padding:26px 28px 8px;font-family:Tahoma,Arial,sans-serif" align="right">' +
+      '<h1 style="margin:0 0 10px;font-size:21px;color:#3a1464;font-family:Tahoma,Arial,sans-serif">' + o.title + '</h1>' +
+      '<p style="margin:0;font-size:14px;line-height:1.9;color:#3d2f52">' + o.intro + '</p>' +
+      (o.steps ? steps_(o.steps) : '') +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border:1px solid #eee8f5;border-radius:8px;overflow:hidden">' + rows + '</table>' +
+      btn +
+      (o.note ? '<p style="margin:18px 0 0;padding:10px 14px;background:#e6f3fa;border-radius:6px;font-size:13px;color:#0a5a8a;line-height:1.8">💡 ' + o.note + '</p>' : '') +
+    '</td></tr>' +
+    // footer
+    '<tr><td style="padding:22px 28px 24px;font-family:Tahoma,Arial,sans-serif;border-top:1px solid #eee8f5" align="right">' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>' +
+      '<td align="right" style="font-size:12px;color:#6b5a80;line-height:1.8;font-family:Tahoma,Arial,sans-serif">' +
+        '<b style="color:#3a1464">جامعة سليمان الراجحي</b><br>الإدارة التنفيذية للاتصالات وتقنية المعلومات<br>مركز عمليات تقنية المعلومات (ITOC)</td>' +
+      '<td align="left" valign="middle" width="110"><a href="https://ictsru.github.io/ITOC/#forms" target="_blank"><img src="cid:itoclogo" width="100" alt="ITOC" style="display:block;border:0;width:100px;height:auto"></a></td>' +
+      '</tr></table>' +
+      '<p style="margin:14px 0 0;font-size:11px;color:#9a90aa;font-family:Tahoma,Arial,sans-serif">هذه رسالة آلية من منصة نبض الشبكة — يرجى عدم الرد عليها. الإصدار ' + APP.VERSION + '</p>' +
+    '</td></tr></table></td></tr></table></body></html>';
 }
 
 /* ---------------- Setup ---------------- */

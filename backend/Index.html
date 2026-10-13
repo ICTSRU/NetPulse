@@ -270,12 +270,12 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v1.6
+ * SRU NetPulse — Frontend v1.7
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '1.6',
+  VERSION: '1.7',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
@@ -405,6 +405,14 @@ function startApp(out){
   tick(); setInterval(tick, 30000);
   route();
   if (!S.user.mobile || S.user.nameMissing) openProfile(true);
+  openDeepLink();
+}
+
+/* Deep link from e-mails: ?ticket=NP-1001 opens that ticket after sign-in */
+function openDeepLink(){
+  const go = id => { if (id && /^NP-\d+$/.test(id)) setTimeout(()=>openTicket(id), 300); };
+  if (HOSTED && google.script.url) google.script.url.getLocation(loc => go(loc.parameter && loc.parameter.ticket));
+  else { try { go(new URLSearchParams(location.search).get('ticket')); } catch(e){} }
 }
 
 /* ---------------- Profile (mobile number) ---------------- */

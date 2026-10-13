@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نبض الشبكة — SRU NetPulse</title>
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/brand/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="assets/brand/site.webmanifest">
+<meta name="theme-color" content="#3a1464">
+<meta name="apple-mobile-web-app-title" content="نبض الشبكة">
+<meta name="description" content="منصة متابعة جودة الإنترنت ودعم الأعطال — جامعة سليمان الراجحي">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --purple:#501e8c; --purple-dark:#3a1464; --purple-light:#f0ebf8;
+  --blue:#0a6eaa; --blue-light:#e6f3fa;
+  --bg:#f7f5fb; --card:#ffffff; --ink:#241436; --muted:#6b5a80;
+  --border:rgba(80,30,140,.12); --radius:4px;
+  --ok:#1a8f4c; --ok-bg:#e7f6ee; --warn:#c77700; --warn-bg:#fff4e0;
+  --bad:#c62828; --bad-bg:#fdecec; --info:#0a6eaa; --info-bg:#e6f3fa;
+  --grey:#7a7488; --grey-bg:#f0eef4;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Cairo,Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6}
+.en{direction:ltr;unicode-bidi:isolate;display:inline-block}
+button,input,select,textarea{font-family:inherit;font-size:14px}
+a{color:var(--blue)}
+.hidden{display:none!important}
+svg.lucide{width:18px;height:18px;stroke-width:2;vertical-align:middle}
+
+/* ---------- header band ---------- */
+.band{background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:8px 20px;gap:12px}
+.band img{height:52px;object-fit:contain}
+.band .ttl{text-align:center;flex:1}
+.band .ttl .np-lockup{height:50px;width:auto}
+.brand .np-mark{width:40px;height:40px}
+.brand b{font-size:20px}
+.signcard .np-sign{width:min(330px,100%);height:auto;margin:4px auto 6px;display:block}
+.by-itoc{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--muted);margin-top:6px}
+.by-itoc img{height:30px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.band .ttl b{display:block;font-size:17px;color:var(--purple)}
+.band .ttl small{color:var(--muted)}
+.logo-fallback{font-weight:800;color:var(--purple);font-size:13px;border:1px dashed var(--border);padding:6px 10px;border-radius:var(--radius)}
+
+/* ---------- topbar ---------- */
+.topbar{background:var(--purple-dark);color:#fff;display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mark{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center}
+.brand b{font-size:20px;letter-spacing:.3px}
+.brand small{display:block;opacity:.8;font-size:12px;margin-top:-4px}
+.topbar .sp{flex:1}
+.clock{font-size:13px;opacity:.9;display:flex;align-items:center;gap:6px}
+.userchip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);padding:4px 10px 4px 4px;border-radius:30px}
+.userchip img,.userchip .av{width:32px;height:32px;border-radius:50%;background:#fff;color:var(--purple);display:grid;place-items:center;font-weight:800}
+.userchip small{display:block;opacity:.75;font-size:11px;margin-top:-3px}
+.iconbtn{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:var(--radius);padding:6px 10px;cursor:pointer}
+.demo-banner{background:var(--warn-bg);color:#7a4a00;text-align:center;font-size:13px;padding:6px;border-bottom:1px solid #f1d7a6}
+
+/* ---------- layout ---------- */
+.layout{display:flex;min-height:calc(100vh - 200px)}
+.side{width:230px;background:var(--purple);color:#fff;padding:14px 10px;flex-shrink:0}
+.side a{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;padding:11px 12px;border-radius:var(--radius);margin-bottom:4px;opacity:.88;font-weight:600}
+.side a:hover{background:rgba(255,255,255,.08);opacity:1}
+.side a.active{background:#fff;color:var(--purple);opacity:1}
+.side hr{border:0;border-top:1px solid rgba(255,255,255,.18);margin:12px 6px}
+.side .grp{font-size:11px;opacity:.6;padding:0 12px 4px}
+main{flex:1;padding:20px;min-width:0}
+.view-title{display:flex;align-items:center;gap:10px;margin:0 0 4px;font-size:22px}
+.view-sub{color:var(--muted);margin:0 0 18px}
+
+/* ---------- components ---------- */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px}
+.card h3{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:8px}
+.card h3 svg{color:var(--blue)}
+.card .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--radius);padding:10px 18px;cursor:pointer;font-weight:700;border:1px solid var(--purple);background:var(--purple);color:#fff}
+.btn:hover{background:var(--purple-dark)}
+.btn.sec{background:#fff;color:var(--purple)}
+.btn.sec:hover{background:var(--purple-light)}
+.btn.block{width:100%}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+label.f{display:block;font-weight:700;font-size:13px;margin-bottom:4px}
+.field{margin-bottom:14px}
+input[type=text],input[type=datetime-local],input[type=search],select,textarea{width:100%;border:1px solid #d9cfe8;border-radius:var(--radius);padding:9px 11px;background:#fff;color:var(--ink)}
+textarea{min-height:96px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(80,30,140,.25);border-color:var(--purple)}
+.hint{font-size:12px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.c-ok{background:var(--ok-bg);color:var(--ok)} .c-warn{background:var(--warn-bg);color:var(--warn)}
+.c-bad{background:var(--bad-bg);color:var(--bad)} .c-info{background:var(--info-bg);color:var(--info)}
+.c-grey{background:var(--grey-bg);color:var(--grey)} .c-purple{background:var(--purple-light);color:var(--purple)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.alert{border-radius:var(--radius);padding:10px 14px;display:flex;gap:8px;align-items:center;font-weight:600;margin:12px 0}
+.kpi{display:flex;gap:14px;align-items:center}
+.kpi .ic{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.kpi .ic svg{width:24px;height:24px}
+.kpi small{color:var(--muted);display:block}
+.kpi b{font-size:26px;line-height:1.2}
+.kpi .foot{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{background:var(--purple-light);color:var(--purple);text-align:right;padding:9px 10px;font-weight:700;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
+.tablewrap{overflow-x:auto}
+.empty{color:var(--muted);text-align:center;padding:28px 10px}
+.empty svg{width:34px;height:34px;opacity:.5;display:block;margin:0 auto 6px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* ---------- speed test ---------- */
+.gauge-wrap{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:18px;align-items:center}
+.gauge{position:relative;width:100%;max-width:300px;margin:auto}
+.gauge svg{width:100%;height:auto}
+.gauge .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:16px}
+.gauge .val b{font-size:46px;line-height:1}
+.gauge .val span{color:var(--muted);font-size:13px}
+.gauge .phase{font-size:13px;color:var(--blue);font-weight:700;min-height:20px}
+.metric{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:8px;margin-bottom:10px}
+.metric .ic{width:40px;height:40px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.metric b{font-size:20px} .metric small{display:block;color:var(--muted);font-size:12px}
+.m-down{background:var(--blue-light)} .m-down svg{color:var(--blue)}
+.m-up{background:var(--ok-bg)} .m-up svg{color:var(--ok)}
+.m-ping{background:var(--purple-light)} .m-ping svg{color:var(--purple)}
+
+/* ---------- building status ---------- */
+.bcard{border:1px solid var(--border);border-radius:8px;padding:14px;background:#fff;border-inline-start:5px solid var(--grey)}
+.bcard.s-ok{border-inline-start-color:var(--ok)} .bcard.s-warn{border-inline-start-color:var(--warn)}
+.bcard.s-slow,.bcard.s-down{border-inline-start-color:var(--bad)} .bcard.s-maintenance{border-inline-start-color:var(--info)}
+.bcard h4{margin:0 0 6px;font-size:15px}
+.bcard .meta{font-size:12px;color:var(--muted);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
+
+/* ---------- success / timeline ---------- */
+.success{background:var(--ok-bg);border:1px solid #bfe5cf;border-radius:8px;padding:22px;text-align:center}
+.success .big{width:56px;height:56px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;margin:0 auto 10px}
+.success .big svg{width:30px;height:30px}
+.tno{display:inline-block;background:#fff;border-radius:8px;padding:10px 24px;margin:12px 0;font-size:26px;font-weight:800;color:var(--purple)}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{position:relative;padding:0 26px 16px 0;border-right:2px solid var(--purple-light);margin-right:8px}
+.timeline li::before{content:"";position:absolute;right:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--purple)}
+.timeline li:last-child{border-right-color:transparent}
+.timeline small{color:var(--muted)}
+.steps{display:flex;gap:4px;margin:12px 0 4px}
+.steps div{flex:1;text-align:center;font-size:12px;color:var(--muted);padding-top:8px;border-top:4px solid var(--grey-bg)}
+.steps div.on{border-top-color:var(--purple);color:var(--purple);font-weight:700}
+
+/* ---------- drawer ---------- */
+.overlay{position:fixed;inset:0;background:rgba(36,20,54,.45);z-index:50;display:flex;justify-content:flex-start}
+.drawer{background:#fff;width:min(520px,100%);height:100%;overflow:auto;padding:22px;box-shadow:0 0 30px rgba(0,0,0,.2)}
+.drawer h3{display:flex;align-items:center;gap:8px;margin-top:0}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;font-size:14px;margin-bottom:14px}
+.kv span{color:var(--muted)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:var(--radius);z-index:60;font-weight:600}
+
+/* ---------- sign-in ---------- */
+#signin{min-height:100vh;display:flex;flex-direction:column}
+#signin .wrap{flex:1;display:grid;place-items:center;padding:30px 16px;background:linear-gradient(160deg,var(--purple-dark),var(--purple) 55%,var(--blue))}
+.signcard{background:#fff;border-radius:10px;max-width:440px;width:100%;padding:30px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.signcard .itoc{height:56px;margin-bottom:8px}
+.signcard h1{font-size:22px;margin:6px 0 2px;color:var(--purple)}
+.signcard p{color:var(--muted);font-size:14px}
+.signcard .note{background:var(--purple-light);border-radius:var(--radius);padding:10px;font-size:13px;color:var(--purple);text-align:right;display:flex;gap:8px}
+#gbtn{display:flex;justify-content:center;margin:18px 0 8px;min-height:44px}
+.err{color:var(--bad);font-weight:700;font-size:13px;min-height:20px}
+
+/* ---------- footer ---------- */
+footer{background:#fff;border-top:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+footer .itoc-f img{height:34px;display:block}
+footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;border-radius:12px;font-weight:700}
+
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){
+  .band .ttl{display:none}
+  .layout{flex-direction:column}
+  .side{width:100%;display:flex;overflow-x:auto;padding:6px;gap:4px}
+  .side a{white-space:nowrap;margin:0;padding:8px 10px}
+  .side hr,.side .grp{display:none}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .gauge-wrap{grid-template-columns:1fr}
+  main{padding:14px}
+  .band img{height:34px}
+  .clock{display:none}
+}
+@media print{.side,.topbar,.no-print,footer{display:none!important}main{padding:0}}
+</style>
+</head>
+<body>
+
+<!-- ===================== ITOC SIGN-IN SCREEN ===================== -->
+<section id="signin">
+  <div class="band">
+    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'جامعة سليمان الراجحي'}))">
+    <div class="ttl"><img class="np-lockup" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse"></div>
+    <img src="assets/ictd-logo.png" alt="الإدارة التنفيذية للاتصالات وتقنية المعلومات" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'ICTD'}))">
+  </div>
+  <div class="wrap">
+    <div class="signcard">
+      <img class="np-sign" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse">
+      <h1 class="sr-only">نبض الشبكة — SRU NetPulse</h1>
+      <p>قِس سرعة الإنترنت، واطّلع على حالة الشبكة في مبناك، وأبلغ عن ضعف الاتصال وتابع معالجة بلاغك.</p>
+      <div class="note"><i data-lucide="shield-check"></i><div>الدخول متاح لمنسوبي الجامعة وطلابها فقط باستخدام البريد الجامعي <b class="en">@sr.edu.sa</b>. ستنتقل بعد الضغط على الزر إلى صفحة تسجيل الدخول من Google.</div></div>
+      <div id="gbtn"></div>
+      <div class="err" id="signErr"></div>
+      <div class="by-itoc"><span>تُدار المنصة بواسطة</span><img src="assets/itoc-logo.png" alt="ITOC — IT Operations Center"></div>
+      <div id="demoEntry" class="hidden">
+        <p class="hint">لم يُضبط الربط مع الخادم بعد — يمكنك تجربة المنصة في وضع العرض التجريبي:</p>
+        <div class="row" style="justify-content:center">
+          <button class="btn" onclick="demoLogin('user')"><i data-lucide="user"></i>دخول كمستخدم</button>
+          <button class="btn sec" onclick="demoLogin('tech')"><i data-lucide="wrench"></i>دخول كفريق فني</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>الإدارة التنفيذية للاتصالات وتقنية المعلومات — مركز عمليات تقنية المعلومات</span>
+    <span class="spacer"></span><span class="ver">v<span class="appver"></span></span>
+    <a class="itoc-f" href="https://ictsru.github.io/ITOC/#forms" target="_blank" rel="noopener"><img src="assets/itoc-logo.png" alt="ITOC" onerror="this.replaceWith(document.createTextNode('ITOC'))"></a>
+  </footer>
+</section>
+
+<!-- ===================== APP ===================== -->
+<section id="app" class="hidden">
+  <div class="band">
+    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'جامعة سليمان الراجحي'}))">
+    <div class="ttl"><img class="np-lockup" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse"></div>
+    <img src="assets/ictd-logo.png" alt="ICTD" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'ICTD'}))">
+  </div>
+  <div id="demoBanner" class="demo-banner hidden">وضع العرض التجريبي — البيانات محفوظة في هذا المتصفح فقط. اضبط <b class="en">API_URL</b> و<b class="en">CLIENT_ID</b> لربط المنصة بـ Google Sheets.</div>
+  <div class="topbar">
+    <div class="brand"><img class="np-mark" src="assets/brand/svg/netpulse-mark-white.svg" alt=""><div><b>نبض الشبكة</b><small class="en">SRU NetPulse — منصة جودة الإنترنت</small></div></div>
+    <div class="sp"></div>
+    <div class="clock"><i data-lucide="calendar-clock"></i><span id="clock"></span></div>
+    <div class="userchip"><span id="uAvatar"></span><div><span id="uName"></span><small id="uRole"></small></div></div>
+    <button class="iconbtn" onclick="signOut()" title="تسجيل الخروج"><i data-lucide="log-out"></i></button>
+  </div>
+  <div class="layout">
+    <nav class="side" id="nav">
+      <a href="#home" data-v="home"><i data-lucide="home"></i>الصفحة الرئيسية</a>
+      <a href="#speed" data-v="speed"><i data-lucide="gauge"></i>قياس الإنترنت</a>
+      <a href="#report" data-v="report"><i data-lucide="file-warning"></i>الإبلاغ عن مشكلة</a>
+      <a href="#track" data-v="track"><i data-lucide="file-search"></i>متابعة البلاغات</a>
+      <a href="#status" data-v="status"><i data-lucide="building-2"></i>الشبكة والمباني</a>
+      <hr class="staff">
+      <div class="grp staff">الفريق الفني</div>
+      <a href="#team" data-v="team" class="staff"><i data-lucide="bar-chart-3"></i>لوحة الفريق الفني</a>
+      <a href="#tickets" data-v="tickets" class="staff"><i data-lucide="list-checks"></i>إدارة البلاغات</a>
+      <a href="#netadmin" data-v="netadmin" class="staff"><i data-lucide="radio-tower"></i>تحديث حالة الشبكة</a>
+    </nav>
+    <main id="main"></main>
+  </div>
+  <footer>
+    <span>الإدارة التنفيذية للاتصالات وتقنية المعلومات — مركز عمليات تقنية المعلومات (ITOC)</span>
+    <span class="spacer"></span><span class="ver">الإصدار <span class="appver"></span></span>
+    <a class="itoc-f" href="https://ictsru.github.io/ITOC/#forms" target="_blank" rel="noopener"><img src="assets/itoc-logo.png" alt="ITOC" onerror="this.replaceWith(document.createTextNode('ITOC'))"></a>
+  </footer>
+</section>
+
+<script>
+/* =============================================================
+ * SRU NetPulse — Frontend v1.2
+ * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
+ * (Google OAuth Web Client ID). Leave both empty for demo mode.
+ * ============================================================= */
+const CONFIG = {
+  VERSION: '1.2',
+  API_URL: '',
+  CLIENT_ID: '',
+  DOMAIN: 'sr.edu.sa',
+  SPEED_SERVER: 'https://speed.cloudflare.com',
+  DEPARTMENTS_URL: 'https://dt.sr.edu.sa/digital-enablement/packages/sru-departments.json'
+};
+const DEMO = !CONFIG.API_URL || !CONFIG.CLIENT_ID;
+
+/* Canonical SRU departments (sru-departments.json, verbatim) — used as fallback if live fetch fails */
+let DEPARTMENTS = [
+ {label:"مكتب رئيس الجامعة",items:["مكتب رئيس الجامعة","وحدة التوعية الفكرية","مركز القيم والسلوك المهني","مكتب إدارة الاستراتيجية","إدارة التميز المؤسسي","إدارة الاتصال المؤسسي","إدارة المسؤولية المجتمعية","إدارة المراجعة الداخلية","مكتب الحوكمة وإدارة المخاطر والالتزام","إدارة الشؤون القانونية"]},
+ {label:"الإدارة التنفيذية لتطوير الأعمال",items:["الإدارة التنفيذية لتطوير الأعمال","إدارة التدريب والاستشارات","مركز التدريب","مركز الاستشارات","إدارة الشراكات","إدارة تطوير المنتجات والخدمات","مركز الابتكار وريادة الأعمال"]},
+ {label:"عمداء الكليات",items:["عمداء الكليات","كلية الطب","كلية التمريض","كلية العلوم التطبيقية","كلية الأعمال"]},
+ {label:"نائب الرئيس للشؤون الأكاديمية",items:["نائب الرئيس للشؤون الأكاديمية","النائب المساعد لتجربة الطالب","مكتب القبول","مكتب المنح والحلول المالية","مكتب التسجيل والإرشاد الأكاديمي","إدارة الحياة الجامعية","مكتب رعاية الخريجين","النائب المساعد للتميز الأكاديمي","مركز التعليم والتعلم","قسم المهارات والمعارف الأساسية","مركز التقييم والقياس","إدارة التجهيزات التعليمية","مكتب الاعتماد الأكاديمي","النائب المساعد للدراسات العليا والبحث العلمي","مكتب الدراسات العليا","مكتب البحث العلمي"]},
+ {label:"المجلس العلمي",items:["المجلس العلمي"]},
+ {label:"المشرفة على القسم النسائي",items:["المشرفة على القسم النسائي","شطر الطالبات"]},
+ {label:"الإدارة التنفيذية للاتصالات وتقنية المعلومات",items:["الإدارة التنفيذية للاتصالات وتقنية المعلومات","إدارة الأمن السيبراني","إدارة التحول الرقمي","إدارة تقنية المعلومات","مكتب إدارة البيانات"]},
+ {label:"الإدارة التنفيذية للخدمات المشتركة",items:["الإدارة التنفيذية للخدمات المشتركة","إدارة الشؤون المالية","إدارة رأس المال البشري","إدارة المرافق","الإدارة الهندسية","إدارة المشتريات","إدارة المستودعات"]}
+];
+
+const ISSUE_TYPES = ['بطء الإنترنت','انقطاع كامل','انقطاع متقطع','ضعف إشارة Wi-Fi','تعذّر الاتصال بالشبكة اللاسلكية','تعذّر تسجيل الدخول للشبكة','بطء نظام أو منصة محددة','أخرى'];
+const T_STATUS = {open:['مفتوح','c-bad'],review:['قيد المراجعة','c-info'],progress:['قيد المعالجة','c-warn'],resolved:['تم الحل','c-ok'],closed:['مغلق','c-grey']};
+const N_STATUS = {ok:['مستقرة','c-ok','var(--ok)'],warn:['تنبيه','c-warn','var(--warn)'],slow:['يوجد بطء','c-bad','var(--bad)'],down:['انقطاع','c-bad','var(--bad)'],maintenance:['صيانة مجدولة','c-info','var(--info)'],unknown:['لا توجد بيانات','c-grey','var(--grey)']};
+const SOURCE_AR = {monitoring:'بيانات المراقبة الفعلية',manual:'تحديث من الفريق الفني',estimate:'مؤشر تقديري من قياسات المستخدمين والبلاغات'};
+const PRIO = {low:['منخفضة','c-grey'],medium:['متوسطة','c-info'],high:['عالية','c-warn'],critical:['حرجة','c-bad']};
+const ROLE_AR = {user:'منسوب / طالب',tech:'الفريق الفني',admin:'مدير النظام'};
+
+const S = { token:null, user:null, locations:[], buildings:[], tickets:[], team:null, lastTest:null, view:'home', charts:{}, prefill:null };
+
+/* ---------------- utilities ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LOC = 'ar-SA-u-nu-latn-ca-gregory';
+const fmtDT = iso => iso ? new Date(iso).toLocaleString(LOC,{weekday:'short',day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+const fmtShort = iso => iso ? new Date(iso).toLocaleString(LOC,{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}) : '—';
+const chip = (map,k) => { const v = map[k] || [k,'c-grey']; return `<span class="chip ${v[1]}">${esc(v[0])}</span>`; };
+const icons = () => window.lucide && lucide.createIcons();
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3200); }
+function dur(ms){ if(!(ms>0)) return '—'; const m=Math.round(ms/60000); if(m<60) return m+' دقيقة'; const h=(m/60); return h<48? h.toFixed(1)+' ساعة' : (h/24).toFixed(1)+' يوم'; }
+function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
+function localInput(d=new Date()){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي @sr.edu.sa فقط.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.'};
+
+/* ---------------- API (real or demo) ---------------- */
+async function api(action, payload={}){
+  if (DEMO) return demoApi(action, payload);
+  const res = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify({ action, idToken:S.token, ...payload }) });
+  const out = await res.json();
+  if (!out.ok) {
+    if (/^AUTH_/.test(out.error) && action!=='login') { signOut(true); }
+    throw new Error(ERR_AR[out.error] || out.error || 'حدث خطأ غير متوقع');
+  }
+  return out;
+}
+
+/* ---------------- Auth (Google Identity Services) ---------------- */
+function initSignin(){
+  document.querySelectorAll('.appver').forEach(e=>e.textContent=CONFIG.VERSION);
+  icons();
+  if (DEMO) { $('#demoEntry').classList.remove('hidden'); $('#gbtn').innerHTML='<span class="hint">وضع العرض التجريبي</span>'; return; }
+  const boot = () => {
+    if (!window.google || !google.accounts) return setTimeout(boot, 200);
+    google.accounts.id.initialize({ client_id: CONFIG.CLIENT_ID, hd: CONFIG.DOMAIN, callback: onCredential, auto_select: true, ux_mode:'popup' });
+    google.accounts.id.renderButton($('#gbtn'), { theme:'filled_blue', size:'large', text:'signin_with', shape:'rectangular', locale:'ar', width: 300 });
+  };
+  boot();
+}
+async function onCredential(resp){
+  $('#signErr').textContent = '';
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if (payload.hd !== CONFIG.DOMAIN) throw new Error(ERR_AR.AUTH_DOMAIN);
+    S.token = resp.credential;
+    const out = await api('login', { client: navigator.userAgent.slice(0,180) });
+    startApp(out);
+  } catch(e){ S.token=null; $('#signErr').textContent = e.message; }
+}
+function demoLogin(role){
+  S.token='demo';
+  demoApi('login',{role}).then(startApp);
+}
+function signOut(expired){
+  S.token=null; S.user=null;
+  if (!DEMO && window.google && google.accounts) google.accounts.id.disableAutoSelect();
+  $('#app').classList.add('hidden'); $('#signin').classList.remove('hidden');
+  if (expired===true) $('#signErr').textContent = ERR_AR.AUTH_INVALID;
+}
+
+function startApp(out){
+  S.user = out.user; S.locations = out.locations; S.buildings = out.buildings; S.tickets = out.tickets || [];
+  $('#signin').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#demoBanner').classList.toggle('hidden', !DEMO);
+  $('#uName').textContent = S.user.name;
+  $('#uRole').textContent = ROLE_AR[S.user.role] || S.user.role;
+  $('#uAvatar').innerHTML = S.user.picture ? `<img src="${esc(S.user.picture)}" alt="">` : `<span class="av">${esc((S.user.name||'?').trim()[0])}</span>`;
+  const staff = isStaff();
+  document.querySelectorAll('.staff').forEach(e=>e.classList.toggle('hidden', !staff));
+  loadDepartments();
+  tick(); setInterval(tick, 30000);
+  route();
+}
+const isStaff = () => S.user && (S.user.role==='tech' || S.user.role==='admin');
+function tick(){ $('#clock').textContent = new Date().toLocaleString(LOC,{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'numeric',minute:'2-digit'}); }
+async function loadDepartments(){
+  try { const r = await fetch(CONFIG.DEPARTMENTS_URL,{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(Array.isArray(j.groups)&&j.groups.length) DEPARTMENTS=j.groups; } } catch(e){ /* fallback to embedded copy */ }
+}
+
+/* ---------------- Router ---------------- */
+window.addEventListener('hashchange', route);
+function route(){
+  if (!S.user) return;
+  let v = (location.hash||'#home').slice(1);
+  const views = {home:vHome,speed:vSpeed,report:vReport,track:vTrack,status:vStatus,team:vTeam,tickets:vTickets,netadmin:vNetAdmin};
+  if (!views[v] || (['team','tickets','netadmin'].includes(v) && !isStaff())) v='home';
+  S.view = v;
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active', a.dataset.v===v));
+  Object.values(S.charts).forEach(c=>c.destroy()); S.charts={};
+  views[v]();
+  icons();
+  window.scrollTo(0,0);
+}
+const go = v => { if (location.hash==='#'+v) route(); else location.hash = v; };
+
+/* ---------------- Views ---------------- */
+function head(icon, title, sub){ return `<h2 class="view-title"><i data-lucide="${icon}"></i>${title}</h2><p class="view-sub">${sub}</p>`; }
+
+function myBuilding(){ try { return localStorage.getItem('np_building') || ''; } catch(e){ return ''; } }
+function setMyBuilding(b){ try { localStorage.setItem('np_building', b); } catch(e){} }
+function buildingOptions(sel){
+  return `<option value="">— اختر المبنى —</option>` + S.locations.map(l=>`<option ${l.building===sel?'selected':''}>${esc(l.building)}</option>`).join('');
+}
+
+function vHome(){
+  const b = S.buildings.find(x=>x.building===myBuilding());
+  const active = S.tickets.filter(t=>['open','review','progress'].includes(t.status));
+  const latest = S.tickets[0];
+  $('#main').innerHTML = `
+    ${head('home','مرحبًا، '+esc(S.user.name.split(' ')[0]),'تابع جودة الإنترنت في الجامعة وأبلغ عن أي مشكلة في الاتصال.')}
+    <div class="grid g3">
+      <div class="card">
+        <h3><i data-lucide="building-2"></i>حالة الشبكة في مبناك</h3>
+        <p class="sub">اختر المبنى الذي تتواجد فيه عادةً</p>
+        <select id="hb" onchange="setMyBuilding(this.value);vHome();icons()">${buildingOptions(myBuilding())}</select>
+        ${b ? `<div style="margin-top:14px">${statusBlock(b)}</div>` : `<div class="empty"><i data-lucide="map-pin"></i>اختر مبناك لعرض حالته</div>`}
+      </div>
+      <div class="card">
+        <h3><i data-lucide="gauge"></i>قياس جودة الإنترنت</h3>
+        <p class="sub">اختبر سرعة التحميل والرفع وزمن الاستجابة من موقعك الحالي</p>
+        ${S.lastTest ? metricsHTML(S.lastTest) : `<div class="empty"><i data-lucide="wifi"></i>لم تُجرِ أي قياس في هذه الجلسة</div>`}
+        <button class="btn block" onclick="go('speed')"><i data-lucide="play"></i>ابدأ القياس</button>
+      </div>
+      <div class="card">
+        <h3><i data-lucide="file-search"></i>بلاغاتي</h3>
+        <p class="sub">${active.length} بلاغ قيد المتابعة من أصل ${S.tickets.length}</p>
+        ${latest ? `<div class="bcard" style="cursor:pointer" onclick="openTicket('${esc(latest.id)}')"><div class="row"><b>${esc(latest.id)}</b><span class="spacer"></span>${chip(T_STATUS,latest.status)}</div><div class="hint">${esc(latest.issueType)} — ${esc(latest.building)}</div><div class="hint">${fmtShort(latest.createdAt)}</div></div>` : `<div class="empty"><i data-lucide="inbox"></i>لا توجد بلاغات</div>`}
+        <div class="row" style="margin-top:12px"><button class="btn" onclick="go('report')"><i data-lucide="send"></i>بلاغ جديد</button><button class="btn sec" onclick="go('track')">كل البلاغات</button></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="row"><h3><i data-lucide="radio-tower"></i>حالة الشبكة في مباني الجامعة</h3><span class="spacer"></span><button class="btn sec sm" onclick="go('status')">التفاصيل</button></div>
+      <div class="grid g4" style="margin-top:12px">${S.buildings.map(x=>`<div class="row" style="justify-content:space-between;border:1px solid var(--border);border-radius:6px;padding:8px 10px"><span style="font-weight:600">${esc(x.building)}</span>${chip(N_STATUS,x.status)}</div>`).join('')}</div>
+    </div>`;
+}
+
+function statusBlock(b){
+  const n = N_STATUS[b.status] || N_STATUS.unknown;
+  return `<div class="alert ${n[1]}" style="margin:0 0 8px"><span class="dot" style="background:${n[2]}"></span>الحالة: ${n[0]}</div>
+    <div class="hint"><i data-lucide="info" style="width:14px;height:14px"></i> المصدر: ${esc(SOURCE_AR[b.source]||b.source)}${b.updatedAt?' — آخر تحديث '+fmtShort(b.updatedAt):''}</div>
+    ${b.note?`<div class="hint">ملاحظة: ${esc(b.note)}</div>`:''}
+    <div class="meta hint" style="margin-top:6px">قياسات آخر 24 ساعة: <b>${b.tests24h}</b> · وسيط التحميل: <b class="en">${b.medianDown||'—'} Mbps</b> · بلاغات مفتوحة: <b>${b.openTickets}</b></div>`;
+}
+
+/* ----- Speed test view ----- */
+function metricsHTML(t){
+  return `<div class="metric m-down"><div class="ic"><i data-lucide="arrow-down"></i></div><div><b class="en">${t.download} Mbps</b><small>سرعة التحميل</small></div></div>
+    <div class="metric m-up"><div class="ic"><i data-lucide="arrow-up"></i></div><div><b class="en">${t.upload} Mbps</b><small>سرعة الرفع</small></div></div>
+    <div class="metric m-ping"><div class="ic"><i data-lucide="activity"></i></div><div><b class="en">${t.ping} ms</b><small>زمن الاستجابة (Ping) — التذبذب <span class="en">${t.jitter} ms</span></small></div></div>`;
+}
+function vSpeed(){
+  const t = S.lastTest || {download:'—',upload:'—',ping:'—',jitter:'—'};
+  $('#main').innerHTML = `
+    ${head('gauge','قياس جودة الإنترنت','اختبر سرعة الإنترنت في موقعك الحالي — يستغرق القياس نحو 20 ثانية.')}
+    <div class="card">
+      <div class="row" style="margin-bottom:14px">
+        <div style="min-width:240px;flex:1"><label class="f">المبنى الحالي</label><select id="sb" onchange="setMyBuilding(this.value)">${buildingOptions(myBuilding())}</select></div>
+        <div style="min-width:180px"><label class="f">نوع الاتصال</label><select id="sc"><option>Wi-Fi</option><option>سلكي (Ethernet)</option><option>بيانات الجوال</option></select></div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg viewBox="0 0 200 170"><defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#0a6eaa"/><stop offset="1" stop-color="#501e8c"/></linearGradient></defs>
+            <path d="M30 150 A80 80 0 1 1 170 150" fill="none" stroke="#ece6f5" stroke-width="16" stroke-linecap="round"/>
+            <path id="garc" d="M30 150 A80 80 0 1 1 170 150" fill="none" stroke="url(#gg)" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+            <text x="30" y="168" font-size="10" fill="#6b5a80" text-anchor="middle">0</text>
+            <text id="gmax" x="170" y="168" font-size="10" fill="#6b5a80" text-anchor="middle">100</text>
+          </svg>
+          <div class="val"><span class="phase" id="gphase">جاهز للقياس</span><b id="gval" class="en">0</b><span>Mbps</span></div>
+        </div>
+        <div id="smetrics">${metricsHTML(t)}</div>
+      </div>
+      <div id="sresult"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="sgo" onclick="runSpeedTest()" style="flex:1"><i data-lucide="refresh-cw"></i>${S.lastTest?'إعادة القياس':'ابدأ القياس'}</button>
+        <button class="btn sec ${S.lastTest?'':'hidden'}" id="srep" onclick="reportFromTest()"><i data-lucide="send"></i>الإبلاغ بهذه النتيجة</button>
+      </div>
+      <p class="hint" style="margin-top:12px">يتم القياس عبر خادم <span class="en">Cloudflare</span> الأقرب لموقعك ويعكس جودة الوصول للإنترنت من جهازك؛ قد تؤثر قوة إشارة Wi-Fi وحالة الجهاز على النتيجة.</p>
+    </div>`;
+  if (S.lastTest) showVerdict(S.lastTest);
+}
+function setGauge(mbps, phase){
+  const max = mbps>500?1000: mbps>250?500 : mbps>100?250:100;
+  $('#gmax') && ($('#gmax').textContent=max);
+  const pct = Math.min(100, (mbps/max)*100);
+  const arc = $('#garc'); if (arc) arc.setAttribute('stroke-dasharray', `${pct} 100`);
+  if ($('#gval')) $('#gval').textContent = mbps>=100? Math.round(mbps) : (Math.round(mbps*10)/10);
+  if (phase && $('#gphase')) $('#gphase').textContent = phase;
+}
+function verdict(t){
+  if (t.download>=25 && t.ping<60) return ['ممتازة','c-ok','check-circle-2'];
+  if (t.download>=10 && t.ping<120) return ['مستقرة','c-ok','check-circle-2'];
+  if (t.download>=3) return ['مستقرة مع ملاحظة بطء','c-warn','alert-triangle'];
+  return ['ضعيفة — يُنصح بالإبلاغ','c-bad','alert-octagon'];
+}
+function showVerdict(t){ const v=verdict(t); $('#sresult').innerHTML = `<div class="alert ${v[1]}"><i data-lucide="${v[2]}"></i>الحالة: ${v[0]}</div>`; icons(); }
+
+async function runSpeedTest(){
+  const btn=$('#sgo'); btn.disabled=true; $('#srep').classList.add('hidden'); $('#sresult').innerHTML='';
+  const base = CONFIG.SPEED_SERVER;
+  try {
+    // 1) Latency & jitter
+    setGauge(0,'قياس زمن الاستجابة…');
+    const pings=[];
+    for (let i=0;i<10;i++){ const t0=performance.now(); await fetch(`${base}/__down?bytes=0&r=${Math.random()}`,{cache:'no-store'}); pings.push(performance.now()-t0); }
+    pings.shift();
+    const ping = Math.round(median(pings));
+    const jitter = Math.round(pings.slice(1).reduce((s,p,i)=>s+Math.abs(p-pings[i]),0)/(pings.length-1));
+
+    // 2) Download (streamed, live gauge)
+    const downSamples=[]; const sizes=[1e5,1e6,5e6,10e6,25e6,25e6]; const dStart=performance.now();
+    for (const bytes of sizes){
+      const t0=performance.now(); const r=await fetch(`${base}/__down?bytes=${bytes}&r=${Math.random()}`,{cache:'no-store'});
+      const reader=r.body.getReader(); let got=0;
+      for(;;){ const {done,value}=await reader.read(); if(done) break; got+=value.length; const el=(performance.now()-t0)/1000; if(el>0.05) setGauge(got*8/el/1e6,'قياس سرعة التحميل…'); }
+      const sec=(performance.now()-t0)/1000; if(bytes>=1e6) downSamples.push(got*8/sec/1e6);
+      if (performance.now()-dStart>10000) break;
+    }
+    const download = +(topAvg(downSamples)).toFixed(1);
+    setGauge(download,'قياس سرعة الرفع…');
+
+    // 3) Upload
+    const upSamples=[]; const uStart=performance.now();
+    for (const bytes of [1e5,1e6,2e6,5e6,5e6]){
+      const blob=new Blob([new Uint8Array(bytes)]); const t0=performance.now();
+      await fetch(`${base}/__up?r=${Math.random()}`,{method:'POST',body:blob,cache:'no-store'});
+      const sec=(performance.now()-t0)/1000; const mbps=bytes*8/sec/1e6; if(bytes>=1e6) upSamples.push(mbps);
+      setGauge(mbps,'قياس سرعة الرفع…');
+      if (performance.now()-uStart>8000) break;
+    }
+    const upload = +(topAvg(upSamples)).toFixed(1);
+
+    const conn = (navigator.connection && navigator.connection.effectiveType) || '';
+    S.lastTest = { download, upload, ping, jitter, at:new Date().toISOString(), building: $('#sb').value, connection: $('#sc').value + (conn?` (${conn})`:'') };
+    setGauge(download,'اكتمل القياس');
+    $('#smetrics').innerHTML = metricsHTML(S.lastTest); showVerdict(S.lastTest);
+    $('#srep').classList.remove('hidden');
+    api('saveSpeedTest',{data:{...S.lastTest, server:'speed.cloudflare.com', client:navigator.userAgent.slice(0,180)}}).catch(()=>{});
+  } catch(e){
+    setGauge(0,'تعذّر القياس');
+    $('#sresult').innerHTML = `<div class="alert c-bad"><i data-lucide="wifi-off"></i>تعذّر الوصول إلى خادم القياس. تحقق من اتصالك بالشبكة ثم أعد المحاولة، أو أبلغ عن المشكلة مباشرة.</div>`;
+    $('#srep').classList.remove('hidden');
+  }
+  btn.disabled=false; btn.innerHTML='<i data-lucide="refresh-cw"></i>إعادة القياس'; icons();
+}
+function topAvg(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>y-x); const h=s.slice(0,Math.max(1,Math.ceil(s.length/2))); return h.reduce((x,y)=>x+y,0)/h.length; }
+function reportFromTest(){ S.prefill = { building: $('#sb').value, issueType: S.lastTest && S.lastTest.download<10 ? 'بطء الإنترنت':'', connection: $('#sc').value }; go('report'); }
+
+/* ----- Report view ----- */
+function deptOptions(){ return `<option value="">— اختر الجهة —</option>` + DEPARTMENTS.map(g=>`<optgroup label="${esc(g.label)}">${g.items.map(i=>`<option>${esc(i)}</option>`).join('')}</optgroup>`).join(''); }
+function vReport(){
+  const p = S.prefill || {}; S.prefill=null;
+  let dept=''; try{ dept=localStorage.getItem('np_dept')||''; }catch(e){}
+  $('#main').innerHTML = `
+    ${head('file-warning','الإبلاغ عن مشكلة','ساعدنا في تحسين الخدمة من خلال الإبلاغ عن أي مشكلة في الإنترنت.')}
+    <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,1fr)">
+      <form class="card" id="rform" onsubmit="submitReport(event)">
+        <div class="grid g2">
+          <div class="field"><label class="f">الكلية / الجهة <span style="color:var(--bad)">*</span></label><select id="rd" required>${deptOptions()}</select></div>
+          <div class="field"><label class="f">نوع المشكلة <span style="color:var(--bad)">*</span></label><select id="rt" required><option value="">— اختر —</option>${ISSUE_TYPES.map(t=>`<option ${t===p.issueType?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div class="field"><label class="f">المبنى <span style="color:var(--bad)">*</span></label><select id="rb" required>${buildingOptions(p.building||myBuilding())}</select></div>
+          <div class="field"><label class="f">الموقع التفصيلي</label><input type="text" id="rs" maxlength="120" placeholder="مثال: الدور الثاني — قاعة 214"></div>
+          <div class="field"><label class="f">وقت المشكلة</label><input type="datetime-local" id="ro" value="${localInput()}"></div>
+          <div class="field"><label class="f">نوع الاتصال</label><select id="rc">${['Wi-Fi','سلكي (Ethernet)','بيانات الجوال'].map(c=>`<option ${p.connection===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        </div>
+        <div class="field"><label class="f">وصف المشكلة <span style="color:var(--bad)">*</span></label>
+          <textarea id="rx" maxlength="500" required placeholder="صف المشكلة بإيجاز: متى بدأت، هل تتكرر، الأنظمة المتأثرة…" oninput="$('#rcnt').textContent=this.value.length+'/500'"></textarea>
+          <div class="hint en" id="rcnt">0/500</div></div>
+        <label class="row hint" style="margin-bottom:14px"><input type="checkbox" id="ra" ${S.lastTest?'checked':'disabled'}> إرفاق نتيجة آخر قياس ${S.lastTest?`(<span class="en">${S.lastTest.download} / ${S.lastTest.upload} Mbps — ${S.lastTest.ping} ms</span>)`:'(لا يوجد قياس — يُنصح بإجراء قياس أولًا)'}</label>
+        <button class="btn block" id="rsend"><i data-lucide="send"></i>إرسال البلاغ</button>
+      </form>
+      <div id="rside" class="card">
+        <h3><i data-lucide="lightbulb"></i>قبل الإرسال</h3>
+        <ul class="hint" style="padding-inline-start:18px;margin:0">
+          <li>أجرِ قياسًا للسرعة وأرفق نتيجته لتسريع التشخيص.</li>
+          <li>تأكد من اتصالك بشبكة الجامعة الصحيحة.</li>
+          <li>جرّب إعادة الاتصال بالشبكة أو إعادة تشغيل الجهاز.</li>
+          <li>ستصلك رسالة على بريدك الجامعي برقم البلاغ وعند كل تحديث.</li>
+        </ul>
+      </div>
+    </div>`;
+  if (dept) $('#rd').value = dept;
+}
+async function submitReport(ev){
+  ev.preventDefault();
+  const b=$('#rsend'); b.disabled=true; b.innerHTML='جارٍ الإرسال…';
+  const data = { department:$('#rd').value, issueType:$('#rt').value, building:$('#rb').value, spot:$('#rs').value.trim(),
+    occurredAt: $('#ro').value ? new Date($('#ro').value).toISOString() : '', connection:$('#rc').value,
+    description:$('#rx').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping} : null };
+  try {
+    try{ localStorage.setItem('np_dept', data.department); }catch(e){}
+    setMyBuilding(data.building);
+    const out = await api('createTicket',{data});
+    S.tickets = (await api('myTickets')).tickets;
+    $('#rside').outerHTML = `<div class="success" id="rside"><div class="big"><i data-lucide="check"></i></div><h3 style="justify-content:center;color:var(--ok)">تم استلام البلاغ</h3><div class="hint">وتم تحويله إلى الفريق الفني</div><div class="hint" style="margin-top:10px">رقم البلاغ:</div><div class="tno en">${esc(out.ticketId)}</div><div class="hint">${fmtDT(new Date().toISOString())}</div><button class="btn sec" style="margin-top:12px" onclick="openTicket('${esc(out.ticketId)}')">متابعة البلاغ</button></div>`;
+    $('#rform').reset(); $('#ro').value=localInput(); $('#rcnt').textContent='0/500';
+    toast('تم إرسال البلاغ '+out.ticketId);
+  } catch(e){ toast(e.message); }
+  b.disabled=false; b.innerHTML='<i data-lucide="send"></i>إرسال البلاغ'; icons();
+}
+
+/* ----- Track view ----- */
+async function vTrack(){
+  $('#main').innerHTML = `${head('file-search','متابعة البلاغات','تابع حالة بلاغاتك ومراحل معالجتها.')}<div class="card" id="tlist"><div class="empty">جارٍ التحميل…</div></div>`;
+  try { S.tickets = (await api('myTickets')).tickets; } catch(e){ toast(e.message); }
+  $('#tlist').innerHTML = S.tickets.length ? ticketTable(S.tickets,false) : `<div class="empty"><i data-lucide="inbox"></i>لا توجد بلاغات بعد. <a href="#report">أرسل بلاغك الأول</a></div>`;
+  icons();
+}
+function ticketTable(list, staff){
+  return `<div class="tablewrap"><table><thead><tr><th>رقم البلاغ</th>${staff?'<th>المُبلِّغ</th>':''}<th>المبنى</th><th>نوع المشكلة</th>${staff?'<th>الأولوية</th><th>المسؤول</th>':''}<th>الحالة</th><th>وقت البلاغ</th></tr></thead><tbody>
+  ${list.map(t=>`<tr class="click" onclick="openTicket('${esc(t.id)}')"><td><b class="en">${esc(t.id)}</b></td>${staff?`<td>${esc(t.name)}</td>`:''}<td>${esc(t.building)}${t.spot?`<div class="hint">${esc(t.spot)}</div>`:''}</td><td>${esc(t.issueType)}</td>${staff?`<td>${chip(PRIO,t.priority)}</td><td>${esc(t.assignee||'—')}</td>`:''}<td>${chip(T_STATUS,t.status)}</td><td>${fmtShort(t.createdAt)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+async function openTicket(id){
+  const ov=document.createElement('div'); ov.className='overlay'; ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div class="drawer"><div class="empty">جارٍ التحميل…</div></div>`; document.body.appendChild(ov);
+  try {
+    const {ticket:t, log} = await api('getTicket',{ticketId:id});
+    const order=['open','review','progress','resolved'];
+    const idx = t.status==='closed'?3:order.indexOf(t.status);
+    const staff=isStaff();
+    ov.querySelector('.drawer').innerHTML = `
+      <div class="row"><h3><i data-lucide="ticket"></i>البلاغ <span class="en">${esc(t.id)}</span></h3><span class="spacer"></span><button class="btn sec sm" onclick="this.closest('.overlay').remove()"><i data-lucide="x"></i></button></div>
+      <div class="steps">${order.map((s,i)=>`<div class="${i<=idx?'on':''}">${T_STATUS[s][0]}</div>`).join('')}</div>
+      <div class="kv" style="margin-top:14px">
+        <span>الحالة</span><div>${chip(T_STATUS,t.status)} ${staff?chip(PRIO,t.priority):''}</div>
+        ${staff?`<span>المُبلِّغ</span><div>${esc(t.name)} <span class="en hint">${esc(t.email)}</span></div>`:''}
+        <span>الجهة</span><div>${esc(t.department||'—')}</div>
+        <span>الموقع</span><div>${esc(t.building)}${t.spot?' — '+esc(t.spot):''}</div>
+        <span>نوع المشكلة</span><div>${esc(t.issueType)} <span class="hint">(${esc(t.connection||'')})</span></div>
+        <span>وقت المشكلة</span><div>${fmtDT(t.occurredAt)}</div>
+        <span>وقت البلاغ</span><div>${fmtDT(t.createdAt)}</div>
+        <span>الوصف</span><div>${esc(t.description)}</div>
+        ${t.test?`<span>القياس المرفق</span><div class="en">↓ ${t.test.download} · ↑ ${t.test.upload} Mbps · ${t.test.ping} ms</div>`:''}
+        ${t.assignee?`<span>المسؤول</span><div>${esc(t.assignee)}</div>`:''}
+        ${t.resolution?`<span>الحل</span><div>${esc(t.resolution)}</div>`:''}
+      </div>
+      ${staff?updateForm(t):''}
+      <h4 style="margin:16px 0 10px">سجل المعالجة</h4>
+      <ul class="timeline">${log.map(l=>`<li><b>${l.action==='created'?'إنشاء البلاغ':'تحديث'} — ${chip(T_STATUS,l.status)}</b><br><small>${fmtDT(l.at)} · ${esc(l.by)}</small>${l.note?`<div>${esc(l.note)}</div>`:''}</li>`).join('')}</ul>`;
+    icons();
+  } catch(e){ ov.querySelector('.drawer').innerHTML=`<div class="alert c-bad">${esc(e.message)}</div>`; }
+}
+function updateForm(t){
+  return `<form class="card" style="background:var(--purple-light)" onsubmit="saveTicket(event,'${esc(t.id)}')">
+    <h3><i data-lucide="wrench"></i>تحديث البلاغ</h3>
+    <div class="grid g2">
+      <div class="field"><label class="f">الحالة</label><select id="us">${Object.keys(T_STATUS).map(k=>`<option value="${k}" ${k===t.status?'selected':''}>${T_STATUS[k][0]}</option>`).join('')}</select></div>
+      <div class="field"><label class="f">الأولوية</label><select id="up">${Object.keys(PRIO).map(k=>`<option value="${k}" ${k===t.priority?'selected':''}>${PRIO[k][0]}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label class="f">المسؤول</label><input type="text" id="ua" value="${esc(t.assignee||'')}" placeholder="اسم الفني المسؤول"></div>
+    <div class="field"><label class="f">ملاحظة للمُبلِّغ</label><textarea id="un" maxlength="500" style="min-height:60px" placeholder="تظهر في سجل المعالجة وتُرسل بالبريد عند تغيير الحالة"></textarea></div>
+    <div class="field"><label class="f">الإجراء المتخذ / الحل</label><textarea id="ur" maxlength="500" style="min-height:60px">${esc(t.resolution||'')}</textarea></div>
+    <button class="btn block"><i data-lucide="save"></i>حفظ التحديث</button></form>`;
+}
+async function saveTicket(ev,id){
+  ev.preventDefault();
+  try {
+    await api('updateTicket',{data:{ticketId:id,status:$('#us').value,priority:$('#up').value,assignee:$('#ua').value,note:$('#un').value,resolution:$('#ur').value}});
+    toast('تم حفظ التحديث'); document.querySelector('.overlay').remove(); S.team=null; route();
+  } catch(e){ toast(e.message); }
+}
+
+/* ----- Network status view ----- */
+async function vStatus(){
+  $('#main').innerHTML = `${head('building-2','الشبكة والمباني','حالة الشبكة في مباني الجامعة وفق بيانات المراقبة، أو مؤشر تقديري من قياسات المستخدمين والبلاغات عند عدم توفرها.')}
+  <div class="row hint" style="margin-bottom:12px">${Object.keys(N_STATUS).map(k=>`<span class="row" style="gap:4px"><span class="dot" style="background:${N_STATUS[k][2]}"></span>${N_STATUS[k][0]}</span>`).join('')}<span class="spacer"></span><button class="btn sec sm" onclick="refreshStatus()"><i data-lucide="refresh-cw"></i>تحديث</button></div>
+  <div class="grid g3" id="blist"></div>`;
+  drawStatus(); refreshStatus(true);
+}
+function drawStatus(){ const el=$('#blist'); if(!el) return; el.innerHTML = S.buildings.map(b=>`<div class="bcard s-${b.status}"><div class="row"><h4>${esc(b.building)}</h4><span class="spacer"></span>${chip(N_STATUS,b.status)}</div>${b.college?`<div class="hint">${esc(b.college)}</div>`:''}<div class="meta"><span><i data-lucide="info" style="width:13px;height:13px"></i> ${esc(SOURCE_AR[b.source]||b.source)}</span>${b.updatedAt?`<span>${fmtShort(b.updatedAt)}</span>`:''}</div>${b.note?`<div class="hint" style="margin-top:6px">${esc(b.note)}</div>`:''}<div class="meta"><span>قياسات 24س: <b>${b.tests24h}</b></span><span>وسيط التحميل: <b class="en">${b.medianDown||'—'} Mbps</b></span><span>بلاغات مفتوحة: <b>${b.openTickets}</b></span></div></div>`).join('') || '<div class="empty">لا توجد مبانٍ مسجلة</div>'; icons(); }
+async function refreshStatus(silent){ try { S.buildings=(await api('getStatus')).buildings; drawStatus(); if(!silent) toast('تم التحديث'); } catch(e){ if(!silent) toast(e.message); } }
+
+/* ----- Team dashboard (tech/admin) ----- */
+async function loadTeam(){ S.team = await api('teamData'); S.buildings = S.team.buildings; return S.team; }
+async function vTeam(){
+  $('#main').innerHTML = `${head('bar-chart-3','لوحة متابعة الفريق الفني','مراقبة البلاغات وحالة الشبكة في جميع مباني الجامعة.')}<div class="empty">جارٍ التحميل…</div>`;
+  let d; try { d = await loadTeam(); } catch(e){ $('#main').innerHTML += `<div class="alert c-bad">${esc(e.message)}</div>`; return; }
+  const T=d.tickets, now=Date.now();
+  const openL = T.filter(t=>['open','review','progress'].includes(t.status));
+  const month = T.filter(t=>new Date(t.createdAt).getMonth()===new Date().getMonth() && new Date(t.createdAt).getFullYear()===new Date().getFullYear());
+  const resp = T.filter(t=>t.firstResponseAt && now-new Date(t.createdAt)<7*864e5).map(t=>new Date(t.firstResponseAt)-new Date(t.createdAt));
+  const resolveT = T.filter(t=>t.resolvedAt && now-new Date(t.createdAt)<30*864e5).map(t=>new Date(t.resolvedAt)-new Date(t.createdAt));
+  const alerts = d.buildings.filter(b=>['warn','slow','down'].includes(b.status));
+  const tests7 = d.tests.filter(t=>now-new Date(t.at)<7*864e5);
+  $('#main').innerHTML = `${head('bar-chart-3','لوحة متابعة الفريق الفني','مراقبة البلاغات وحالة الشبكة في جميع مباني الجامعة.')}
+  <div class="grid g4">
+    ${kpi('file-text','var(--warn-bg)','var(--warn)','البلاغات المفتوحة',openL.length,`من إجمالي ${month.length} بلاغ هذا الشهر`)}
+    ${kpi('clock','var(--ok-bg)','var(--ok)','متوسط زمن الاستجابة',dur(resp.reduce((a,b)=>a+b,0)/(resp.length||1)),'أول استجابة — آخر 7 أيام')}
+    ${kpi('check-circle-2','var(--blue-light)','var(--blue)','متوسط زمن الحل',dur(resolveT.reduce((a,b)=>a+b,0)/(resolveT.length||1)),'آخر 30 يومًا')}
+    ${kpi('alert-triangle',alerts.length?'var(--bad-bg)':'var(--ok-bg)',alerts.length?'var(--bad)':'var(--ok)','حالة الشبكة',alerts.length?'تنبيه':'مستقرة',alerts.length?`${alerts.length} مبنى يحتاج متابعة`:'جميع المباني مستقرة')}
+  </div>
+  <div class="grid" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);margin-top:16px">
+    <div class="card"><div class="row"><h3><i data-lucide="trending-up"></i>اتجاه البلاغات</h3><span class="spacer"></span><button class="btn sec sm" onclick="trend(7,this)">7 أيام</button><button class="btn sm" onclick="trend(30,this)">30 يوم</button></div><div style="height:250px"><canvas id="ctrend"></canvas></div></div>
+    <div class="card"><h3><i data-lucide="pie-chart"></i>البلاغات حسب المبنى (مفتوحة)</h3><div style="height:250px"><canvas id="cbld"></canvas></div></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><div class="row"><h3><i data-lucide="list"></i>أحدث البلاغات</h3><span class="spacer"></span><a href="#tickets">عرض الكل</a></div>${T.length?ticketTable(T.slice(0,6),true):'<div class="empty">لا توجد بلاغات</div>'}</div>
+    <div class="card"><h3><i data-lucide="gauge"></i>متوسط سرعة التحميل حسب المبنى (7 أيام)</h3><p class="sub">${tests7.length} قياس من المستخدمين</p><div style="height:250px"><canvas id="cspeed"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><div class="row"><h3><i data-lucide="map-pin"></i>حالة الشبكة في مباني الجامعة</h3><span class="spacer"></span><a href="#netadmin">تحديث الحالة</a></div><div class="grid g4" style="margin-top:10px">${d.buildings.map(b=>`<div class="bcard s-${b.status}"><div class="row"><b>${esc(b.building)}</b><span class="spacer"></span>${chip(N_STATUS,b.status)}</div><div class="hint">${esc(SOURCE_AR[b.source]||'')}</div><div class="hint">مفتوحة: ${b.openTickets} · وسيط <span class="en">${b.medianDown||'—'} Mbps</span></div></div>`).join('')}</div></div>`;
+  icons();
+  if (!window.Chart) return;
+  Chart.defaults.font.family='Cairo, Tahoma, Arial'; Chart.defaults.color='#6b5a80';
+  trend(30);
+  const byB = {}; openL.forEach(t=>byB[t.building]=(byB[t.building]||0)+1);
+  S.charts.b = new Chart($('#cbld'),{type:'bar',data:{labels:Object.keys(byB),datasets:[{data:Object.values(byB),backgroundColor:'#501e8c',borderRadius:4}]},options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{position:'right'}}}});
+  const sp={}; tests7.forEach(t=>{(sp[t.building]=sp[t.building]||[]).push(t.down)});
+  S.charts.s = new Chart($('#cspeed'),{type:'bar',data:{labels:Object.keys(sp),datasets:[{label:'Mbps',data:Object.values(sp).map(a=>+(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1)),backgroundColor:'#0a6eaa',borderRadius:4}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,position:'right'}}}});
+}
+function kpi(icon,bg,fg,label,val,foot){ return `<div class="card kpi"><div class="ic" style="background:${bg};color:${fg}"><i data-lucide="${icon}"></i></div><div><small>${label}</small><b>${val}</b><div class="foot">${foot}</div></div></div>`; }
+function trend(days, btn){
+  if (btn){ btn.parentElement.querySelectorAll('.btn').forEach(b=>b.classList.add('sec')); btn.classList.remove('sec'); }
+  const labels=[], data=[]; const T=S.team.tickets;
+  for (let i=days-1;i>=0;i--){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i); const e=new Date(d); e.setDate(e.getDate()+1);
+    labels.push(d.toLocaleDateString(LOC,{day:'numeric',month:'short'})); data.push(T.filter(t=>{const c=new Date(t.createdAt); return c>=d&&c<e;}).length); }
+  if (S.charts.t) S.charts.t.destroy();
+  S.charts.t = new Chart($('#ctrend'),{type:'line',data:{labels,datasets:[{data,borderColor:'#0a6eaa',backgroundColor:'rgba(10,110,170,.12)',fill:true,tension:.3,pointRadius:3}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0},position:'right'},x:{reverse:true}}}});
+}
+
+/* ----- Ticket management (tech/admin) ----- */
+async function vTickets(){
+  $('#main').innerHTML = `${head('list-checks','إدارة البلاغات','فرز البلاغات وتحديث حالتها وتعيين المسؤول — يصل المُبلِّغ بريد تلقائي عند تغيير الحالة.')}
+  <div class="card"><div class="row" style="margin-bottom:12px">
+    <input type="search" id="fq" placeholder="بحث برقم البلاغ أو الاسم أو الوصف…" style="flex:2;min-width:200px" oninput="filterTickets()">
+    <select id="fs" style="flex:1;min-width:140px" onchange="filterTickets()"><option value="active">المفتوحة (كل المراحل)</option><option value="">كل الحالات</option>${Object.keys(T_STATUS).map(k=>`<option value="${k}">${T_STATUS[k][0]}</option>`).join('')}</select>
+    <select id="fb" style="flex:1;min-width:140px" onchange="filterTickets()"><option value="">كل المباني</option>${S.locations.map(l=>`<option>${esc(l.building)}</option>`).join('')}</select>
+    <button class="btn sec sm" onclick="exportCSV()"><i data-lucide="download"></i>تصدير CSV</button>
+  </div><div id="tbl"><div class="empty">جارٍ التحميل…</div></div></div>`;
+  icons();
+  try { await loadTeam(); filterTickets(); } catch(e){ $('#tbl').innerHTML=`<div class="alert c-bad">${esc(e.message)}</div>`; }
+}
+function currentFiltered(){
+  const q=($('#fq').value||'').trim().toLowerCase(), s=$('#fs').value, b=$('#fb').value;
+  return S.team.tickets.filter(t=>(s==='active'?['open','review','progress'].includes(t.status):(!s||t.status===s)) && (!b||t.building===b) &&
+    (!q||[t.id,t.name,t.email,t.description,t.issueType,t.spot].join(' ').toLowerCase().includes(q)));
+}
+function filterTickets(){ const l=currentFiltered(); $('#tbl').innerHTML = l.length? ticketTable(l,true) : '<div class="empty"><i data-lucide="inbox"></i>لا توجد نتائج</div>'; icons(); }
+function exportCSV(){
+  const cols=['id','createdAt','name','email','department','building','spot','issueType','connection','status','priority','assignee','firstResponseAt','resolvedAt','description','resolution'];
+  const rows=[cols.join(',')].concat(currentFiltered().map(t=>cols.map(c=>'"'+String(t[c]??'').replace(/"/g,'""')+'"').join(',')));
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+rows.join('\n')],{type:'text/csv'})); a.download='netpulse-tickets-'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+}
+
+/* ----- Manual network status (tech/admin) ----- */
+function vNetAdmin(){
+  $('#main').innerHTML = `${head('radio-tower','تحديث حالة الشبكة','يُستخدم عند غياب بيانات المراقبة الآلية أو للإعلان عن صيانة. التحديث الآلي من أنظمة المراقبة يصل عبر نقطة الربط pushStatus.')}
+  <div class="grid g2">
+    <form class="card" onsubmit="saveNet(event)">
+      <h3><i data-lucide="edit-3"></i>تحديث يدوي</h3>
+      <div class="field"><label class="f">المبنى</label><select id="nb" required>${buildingOptions('')}</select></div>
+      <div class="field"><label class="f">الحالة</label><select id="ns">${Object.keys(N_STATUS).filter(k=>k!=='unknown').map(k=>`<option value="${k}">${N_STATUS[k][0]}</option>`).join('')}</select></div>
+      <div class="field"><label class="f">ملاحظة تظهر للمستخدمين</label><input type="text" id="nn" maxlength="300" placeholder="مثال: أعمال صيانة على مبدّل الدور الأول حتى 2:00 م"></div>
+      <button class="btn block"><i data-lucide="save"></i>نشر الحالة</button>
+      <p class="hint">تبقى الحالة اليدوية فعّالة لمدة <b>STALE_HOURS</b> (افتراضيًا 6 ساعات) ثم تعود المنصة للمؤشر التقديري ما لم يصل تحديث جديد.</p>
+    </form>
+    <div class="card"><h3><i data-lucide="zap"></i>الربط الآلي مع أنظمة المراقبة</h3>
+      <p class="sub">أرسل حالة المباني تلقائيًا من n8n أو Zabbix أو PRTG أو لوحة Wi-Fi Controller كل 5 دقائق:</p>
+      <pre class="en" style="background:#1e1530;color:#e9e2f5;padding:12px;border-radius:6px;font-size:12px;overflow:auto;text-align:left">POST {API_URL}
+{
+  "action": "pushStatus",
+  "key": "MONITOR_KEY",
+  "source": "zabbix",
+  "items": [
+    {"building":"مبنى كلية الطب","status":"slow",
+     "note":"Uplink utilization 92%"}
+  ]
+}</pre>
+      <p class="hint">القيم المسموحة للحالة: <span class="en">ok · warn · slow · down · maintenance</span></p></div>
+  </div>`;
+  icons();
+}
+async function saveNet(ev){ ev.preventDefault(); try{ const o=await api('setBuildingStatus',{data:{building:$('#nb').value,status:$('#ns').value,note:$('#nn').value}}); S.buildings=o.buildings; toast('تم نشر الحالة'); ev.target.reset(); }catch(e){ toast(e.message); } }
+
+/* =============================================================
+ * DEMO BACKEND — mirrors Code.gs actions using localStorage
+ * ============================================================= */
+function demoDB(){
+  let db; try { db = JSON.parse(localStorage.getItem('np_demo')||'null'); } catch(e){}
+  if (db && db.v===CONFIG.VERSION) return db;
+  const now=Date.now(), h=36e5;
+  const L=['مبنى كلية الطب','مبنى كلية التمريض','مبنى كلية العلوم التطبيقية','مبنى كلية الأعمال','المبنى الإداري','المكتبة','شطر الطالبات','السكن الجامعي'];
+  const mk=(n,hrs,b,type,st,name,desc,resp)=>({id:'NP-'+n,createdAt:new Date(now-hrs*h).toISOString(),email:'demo.user@sr.edu.sa',name,department:'كلية الطب',building:b,spot:'',issueType:type,connection:'Wi-Fi',occurredAt:new Date(now-hrs*h).toISOString(),description:desc,status:st,priority:type==='انقطاع كامل'?'high':'medium',assignee:st==='open'?'':'فريق الشبكات',firstResponseAt:resp?new Date(now-(hrs-resp)*h).toISOString():'',resolvedAt:st==='resolved'?new Date(now-(hrs-resp-2)*h).toISOString():'',updatedAt:new Date(now-hrs*h).toISOString(),resolution:st==='resolved'?'تم استبدال نقطة الوصول اللاسلكية':'',test:{download:6.2,upload:3.1,ping:48}});
+  const tickets=[];
+  const types=['بطء الإنترنت','انقطاع متقطع','ضعف إشارة Wi-Fi','انقطاع كامل'];
+  for(let i=0;i<34;i++){ const hrs=6+i*19; tickets.push(mk(1010+i,hrs,L[i%L.length],types[i%4],i<4?(['open','review','progress','open'][i]):(i%7===0?'closed':'resolved'),['أحمد عبدالله','سارة محمد','خالد علي','نورة سعد'][i%4],'يوجد بطء ملحوظ في تصفح الإنترنت ويؤثر على استخدام الأنظمة التعليمية.',0.3+i%3*0.4)); }
+  db={v:CONFIG.VERSION,tickets,log:tickets.map(t=>({at:t.createdAt,ticketId:t.id,action:'created',status:'open',note:'',by:t.email})),
+    tests:Array.from({length:60},(_,i)=>({at:new Date(now-i*2.5*h).toISOString(),building:L[i%L.length],down:+(8+Math.random()*60).toFixed(1),up:+(4+Math.random()*25).toFixed(1),ping:Math.round(15+Math.random()*50)})),
+    stat:{'مبنى كلية الطب':{status:'slow',source:'monitoring',note:'استخدام الوصلة الرئيسية 92%',updatedAt:new Date(now-0.4*h).toISOString()},'مبنى كلية الأعمال':{status:'warn',source:'manual',note:'متابعة ضعف الإشارة في الدور الثاني',updatedAt:new Date(now-h).toISOString()}},
+    L, seq:1043};
+  demoSave(db); return db;
+}
+function demoSave(db){ try{ localStorage.setItem('np_demo',JSON.stringify(db)); }catch(e){} }
+function demoStatus(db){
+  const now=Date.now();
+  return db.L.map(b=>{
+    const bt=db.tests.filter(t=>t.building===b && now-new Date(t.at)<864e5).map(t=>t.down), med=median(bt);
+    const open=db.tickets.filter(t=>t.building===b && ['open','review','progress'].includes(t.status)).length;
+    const s=db.stat[b]; const fresh=s && now-new Date(s.updatedAt)<6*36e5;
+    let status='unknown';
+    if(!fresh){ if(open>=3||(bt.length>=3&&med<5))status='slow'; else if(open>=1||(bt.length>=3&&med<15))status='warn'; else if(bt.length)status='ok'; }
+    return {building:b,college:b.startsWith('مبنى ')?b.slice(5):'',status:fresh?s.status:status,source:fresh?s.source:'estimate',note:fresh?s.note:'',updatedAt:fresh?s.updatedAt:(bt.length?new Date().toISOString():''),tests24h:bt.length,medianDown:Math.round(med*10)/10,openTickets:open};
+  });
+}
+async function demoApi(action,p){
+  await new Promise(r=>setTimeout(r,180));
+  const db=demoDB(); const u=S.user||{email:'demo.user@sr.edu.sa'};
+  const mine=()=>db.tickets.filter(t=>t.email===u.email).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  switch(action){
+    case 'login': { const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user'}; S.user=user;
+      return {ok:true,user,locations:db.L.map(b=>({building:b,college:''})),buildings:demoStatus(db),tickets:db.tickets.filter(t=>t.email===user.email)}; }
+    case 'getStatus': return {ok:true,buildings:demoStatus(db)};
+    case 'saveSpeedTest': db.tests.unshift({at:new Date().toISOString(),building:p.data.building,down:p.data.download,up:p.data.upload,ping:p.data.ping}); demoSave(db); return {ok:true};
+    case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||(d.description||'').length<5) throw new Error(ERR_AR.MISSING_FIELDS);
+      const id='NP-'+(++db.seq); const now=new Date().toISOString();
+      db.tickets.unshift({id,createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test});
+      db.log.push({at:now,ticketId:id,action:'created',status:'open',note:'',by:u.email}); demoSave(db); return {ok:true,ticketId:id}; }
+    case 'myTickets': return {ok:true,tickets:mine()};
+    case 'getTicket': { const t=db.tickets.find(x=>x.id===p.ticketId); if(!t) throw new Error(ERR_AR.NOT_FOUND); return {ok:true,ticket:t,log:db.log.filter(l=>l.ticketId===t.id)}; }
+    case 'teamData': return {ok:true,tickets:db.tickets,tests:db.tests,buildings:demoStatus(db)};
+    case 'updateTicket': { const d=p.data, t=db.tickets.find(x=>x.id===d.ticketId), now=new Date().toISOString();
+      Object.assign(t,{status:d.status,priority:d.priority,assignee:d.assignee,resolution:d.resolution,updatedAt:now});
+      if(!t.firstResponseAt&&d.status!=='open') t.firstResponseAt=now; if(['resolved','closed'].includes(d.status)&&!t.resolvedAt) t.resolvedAt=now;
+      db.log.push({at:now,ticketId:t.id,action:'updated',status:t.status,note:d.note,by:u.email}); demoSave(db); return {ok:true}; }
+    case 'setBuildingStatus': db.stat[p.data.building]={status:p.data.status,source:'manual',note:p.data.note,updatedAt:new Date().toISOString()}; demoSave(db); return {ok:true,buildings:demoStatus(db)};
+  }
+  throw new Error('UNKNOWN_ACTION');
+}
+
+initSignin();
+</script>
+</body>
+</html>

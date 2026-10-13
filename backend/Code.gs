@@ -2,11 +2,18 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 1.5  (2026-10-13)
+ *  Version: 1.6  (2026-10-13)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
- *    CLIENT_ID       (required) Google OAuth Web Client ID used by the frontend
+ *  HOSTING MODES
+ *    A) Apps Script-hosted (default, no Client ID needed): the platform page is served by
+ *       doGet() from the file "Index"; deploy Execute as: Me, Who has access:
+ *       "Anyone within Sulaiman Al Rajhi University". Google signs the user in and
+ *       Session.getActiveUser() identifies them.
+ *    B) GitHub-hosted with Google Sign-In: needs CLIENT_ID and access "Anyone" (doPost path).
+ *
+ *    CLIENT_ID       (mode B only) Google OAuth Web Client ID used by the frontend
  *    ALLOWED_DOMAINS (optional) comma-separated, default: sr.edu.sa,srcolleges.org
  *    ADMIN_EMAILS    (optional) comma-separated bootstrap admins
  *    NOTIFY_EMAIL    (optional) NOC/helpdesk mailbox notified on every new ticket
@@ -18,7 +25,7 @@
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '1.5' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '1.6' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -39,8 +46,35 @@ const STATUS_AR = { open: 'مفتوح', review: 'قيد المراجعة', progr
 
 /* ---------------- Entry points ---------------- */
 
-function doGet() {
-  return json_({ ok: true, app: APP.NAME, version: APP.VERSION, time: new Date().toISOString() });
+function doGet(e) {
+  if (e && e.parameter && e.parameter.health) {
+    return json_({ ok: true, app: APP.NAME, version: APP.VERSION, time: new Date().toISOString() });
+  }
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('نبض الشبكة — SRU NetPulse')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Mode A entry point — called from the page with google.script.run.apiCall(action, payload). */
+function apiCall(action, payload) {
+  try {
+    if (action === 'pushStatus') return { ok: false, error: 'UNKNOWN_ACTION' };
+    return route_(String(action || ''), sessionUser_(), payload || {});
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+}
+
+/** Mode A identity: the Google account signed in to the Apps Script page. */
+function sessionUser_() {
+  const email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (!email) throw new Error('AUTH_REQUIRED');
+  const domain = email.split('@')[1] || '';
+  if (allowedDomains_().indexOf(domain) === -1) throw new Error('AUTH_DOMAIN');
+  const row = userRow_(email);
+  const name = row && row.Name ? String(row.Name) : '';
+  return { email: email, name: name || email.split('@')[0], nameMissing: !name, picture: '', role: roleOf_(email) };
 }
 
 function doPost(e) {
@@ -52,22 +86,26 @@ function doPost(e) {
     if (action === 'pushStatus') return json_(pushStatus_(body));
 
     const user = authenticate_(body.idToken);
-    switch (action) {
-      case 'login':          return json_(login_(user, body));
-      case 'saveProfile':    return json_(saveProfile_(user, body.data || {}));
-      case 'getStatus':      return json_({ ok: true, buildings: buildingStatus_() });
-      case 'saveSpeedTest':  return json_(saveSpeedTest_(user, body.data || {}));
-      case 'createTicket':   return json_(createTicket_(user, body.data || {}));
-      case 'myTickets':      return json_({ ok: true, tickets: myTickets_(user) });
-      case 'getTicket':      return json_(getTicket_(user, body.ticketId));
-      case 'teamData':       requireRole_(user, ['tech', 'admin']); return json_(teamData_());
-      case 'updateTicket':   requireRole_(user, ['tech', 'admin']); return json_(updateTicket_(user, body.data || {}));
-      case 'setBuildingStatus': requireRole_(user, ['tech', 'admin']); return json_(setBuildingStatus_(user, body.data || {}));
-      default: return json_({ ok: false, error: 'UNKNOWN_ACTION' });
-    }
+    return json_(route_(action, user, body));
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
   }
+}
+
+function route_(action, user, body) {
+    switch (action) {
+      case 'login':          return login_(user, body);
+      case 'saveProfile':    return saveProfile_(user, body.data || {});
+      case 'getStatus':      return { ok: true, buildings: buildingStatus_() };
+      case 'saveSpeedTest':  return saveSpeedTest_(user, body.data || {});
+      case 'createTicket':   return createTicket_(user, body.data || {});
+      case 'myTickets':      return { ok: true, tickets: myTickets_(user) };
+      case 'getTicket':      return getTicket_(user, body.ticketId);
+      case 'teamData':       requireRole_(user, ['tech', 'admin']); return teamData_();
+      case 'updateTicket':   requireRole_(user, ['tech', 'admin']); return updateTicket_(user, body.data || {});
+      case 'setBuildingStatus': requireRole_(user, ['tech', 'admin']); return setBuildingStatus_(user, body.data || {});
+      default: return { ok: false, error: 'UNKNOWN_ACTION' };
+    }
 }
 
 /* ---------------- Authentication (Google ID token, @sr.edu.sa only) ---------------- */
@@ -120,17 +158,22 @@ function normalizeMobile_(v) {
 
 function saveProfile_(user, d) {
   const mobile = normalizeMobile_(d.mobile);
-  upsertUserMobile_(user, mobile);
-  return { ok: true, mobile: mobile };
+  const name = clean_(d.name, 120);
+  if (name) user.name = name;
+  upsertUserMobile_(user, mobile, name);
+  return { ok: true, mobile: mobile, name: user.name };
 }
 
-function upsertUserMobile_(user, mobile) {
+function upsertUserMobile_(user, mobile, name) {
   const sh = sheet_(SHEETS.USERS);
   const data = sh.getDataRange().getValues();
   const H = data[0];
-  const ce = H.indexOf('Email'), cm = H.indexOf('Mobile');
+  const ce = H.indexOf('Email'), cm = H.indexOf('Mobile'), cn = H.indexOf('Name');
   const idx = data.findIndex((r, i) => i > 0 && String(r[ce]).toLowerCase() === user.email);
-  if (idx > 0) sh.getRange(idx + 1, cm + 1).setValue("'" + mobile);
+  if (idx > 0) {
+    sh.getRange(idx + 1, cm + 1).setValue("'" + mobile);
+    if (name) sh.getRange(idx + 1, cn + 1).setValue(name);
+  }
   else appendRow_(SHEETS.USERS, { Email: user.email, Name: user.name, Role: 'user', Active: true, Notes: 'self-registered', Mobile: "'" + mobile });
 }
 

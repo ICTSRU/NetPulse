@@ -1,5 +1,16 @@
 # Changelog — SRU NetPulse
 
+## v1.6 — 2026-10-13
+### Added
+- **No-Client-ID mode (default):** the platform page is served directly by Apps Script (`doGet` → `backend/Index.html`); Google signs the user in and `Session.getActiveUser()` identifies them. No Google Cloud project or OAuth Client ID is needed.
+- GitHub page keeps the branded ITOC sign-in card; its button «الدخول بالبريد الجامعي» opens the Apps Script page.
+- `apiCall()` server entry point used through `google.script.run`; shared `route_()` for both hosting modes.
+- Profile prompt now also asks for the **full name** when it is not on file (Apps Script does not expose the Google display name).
+- `backend/Index.html`: generated copy of `index.html` with all logos embedded (Apps Script cannot serve the `assets/` folder).
+### Changed
+- Health check moved to `?health=1`; plain `/exec` now returns the platform page.
+- Google Sign-In (Client ID) mode is kept as an option and activates automatically if `CONFIG.CLIENT_ID` is set.
+
 ## v1.5 — 2026-10-13
 ### Changed
 - `CONFIG.API_URL` updated to the new Web App deployment: `https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec` (replaces the v1.4 URL).

@@ -213,7 +213,7 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
       <img class="np-sign" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse">
       <h1 class="sr-only">نبض الشبكة — SRU NetPulse</h1>
       <p>قِس سرعة الإنترنت، واطّلع على حالة الشبكة في مبناك، وأبلغ عن ضعف الاتصال وتابع معالجة بلاغك.</p>
-      <div class="note"><i data-lucide="shield-check"></i><div>الدخول متاح لمنسوبي الجامعة وطلابها فقط باستخدام البريد الجامعي <b class="en">@sr.edu.sa</b> أو <b class="en">@srcolleges.org</b>. ستنتقل بعد الضغط على الزر إلى صفحة تسجيل الدخول من Google.</div></div>
+      <div class="note"><i data-lucide="shield-check"></i><div>الدخول متاح لمنسوبي الجامعة وطلابها فقط باستخدام البريد الجامعي <b class="en">@sr.edu.sa</b> أو <b class="en">@srcolleges.org</b>. ستنتقل بعد الضغط على الزر إلى صفحة تسجيل الدخول من Google، ثم تعود تلقائيًا إلى المنصة.</div></div>
       <div id="gbtn"></div>
       <div class="err" id="signErr"></div>
       <div class="by-itoc"><span>تُدار المنصة بواسطة</span><img src="assets/itoc-logo.png" alt="ITOC — IT Operations Center"></div>
@@ -273,19 +273,20 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v1.5
+ * SRU NetPulse — Frontend v1.6
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '1.5',
+  VERSION: '1.6',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
   SPEED_SERVER: 'https://speed.cloudflare.com',
   DEPARTMENTS_URL: 'https://dt.sr.edu.sa/digital-enablement/packages/sru-departments.json'
 };
-const DEMO = !CONFIG.API_URL;
+const HOSTED = !!(window.google && google.script && google.script.run);   // running inside Apps Script
+const DEMO = !HOSTED && !CONFIG.API_URL;
 
 /* Canonical SRU departments (sru-departments.json, verbatim) — used as fallback if live fetch fails */
 let DEPARTMENTS = [
@@ -325,6 +326,11 @@ const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجام
 /* ---------------- API (real or demo) ---------------- */
 async function api(action, payload={}){
   if (DEMO) return demoApi(action, payload);
+  if (HOSTED) {
+    const out = await new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej).apiCall(action, payload));
+    if (!out || !out.ok) throw new Error(ERR_AR[out && out.error] || (out && out.error) || 'حدث خطأ غير متوقع');
+    return out;
+  }
   const res = await fetch(CONFIG.API_URL, { method:'POST', body: JSON.stringify({ action, idToken:S.token, ...payload }) });
   const out = await res.json();
   if (!out.ok) {
@@ -339,8 +345,16 @@ function initSignin(){
   document.querySelectorAll('.appver').forEach(e=>e.textContent=CONFIG.VERSION);
   icons();
   if (DEMO) { $('#demoEntry').classList.remove('hidden'); $('#gbtn').innerHTML='<span class="hint">وضع العرض التجريبي</span>'; return; }
+  if (HOSTED) {                       // Google has already signed the user in
+    $('#gbtn').innerHTML='<span class="hint">جارٍ الدخول…</span>';
+    api('login',{client:navigator.userAgent.slice(0,180)}).then(startApp).catch(e=>{ $('#gbtn').innerHTML=''; $('#signErr').textContent=e.message; });
+    return;
+  }
+  if (!CONFIG.CLIENT_ID) {            // GitHub page: branded ITOC screen → Apps Script page (Google sign-in)
+    $('#gbtn').innerHTML = `<a class="btn" href="${esc(CONFIG.API_URL)}" target="_top" style="text-decoration:none;min-width:260px"><i data-lucide="log-in"></i>الدخول بالبريد الجامعي</a>`;
+    icons(); return;
+  }
   checkBackend();
-  if (!CONFIG.CLIENT_ID) { $('#gbtn').innerHTML=''; $('#signErr').textContent='لم يُضبط معرّف تسجيل الدخول (CLIENT_ID) بعد — يرجى التواصل مع مركز عمليات تقنية المعلومات.'; return; }
   const boot = () => {
     if (!window.google || !google.accounts) return setTimeout(boot, 200);
     google.accounts.id.initialize({ client_id: CONFIG.CLIENT_ID, callback: onCredential, auto_select: true, ux_mode:'popup' });
@@ -361,7 +375,7 @@ async function onCredential(resp){
 /* Backend reachability check — the Web App must be deployed with access "Anyone" */
 async function checkBackend(){
   try {
-    const r = await fetch(CONFIG.API_URL, { cache:'no-store' });
+    const r = await fetch(CONFIG.API_URL + '?health=1', { cache:'no-store' });
     const j = await r.json();
     if (!j.ok) throw new Error('bad');
     console.info('NetPulse backend v' + j.version + ' reachable');
@@ -374,6 +388,7 @@ function demoLogin(role){
   demoApi('login',{role}).then(startApp);
 }
 function signOut(expired){
+  if (HOSTED) { window.open('https://accounts.google.com/Logout', '_top'); return; }
   S.token=null; S.user=null;
   if (!DEMO && window.google && google.accounts) google.accounts.id.disableAutoSelect();
   $('#app').classList.add('hidden'); $('#signin').classList.remove('hidden');
@@ -392,7 +407,7 @@ function startApp(out){
   loadDepartments();
   tick(); setInterval(tick, 30000);
   route();
-  if (!S.user.mobile) openProfile(true);
+  if (!S.user.mobile || S.user.nameMissing) openProfile(true);
 }
 
 /* ---------------- Profile (mobile number) ---------------- */
@@ -403,7 +418,8 @@ function openProfile(required){
   ov.innerHTML=`<form class="modal" onsubmit="saveProfile(event)">
     <h3><i data-lucide="smartphone"></i>${required?'أكمل بياناتك':'بياناتي'}</h3>
     <p class="hint">${required?'نحتاج رقم جوالك ليتواصل معك الفريق الفني بشأن بلاغاتك عند الحاجة.':'يُستخدم رقم الجوال للتواصل بشأن بلاغاتك فقط.'}</p>
-    <div class="kv" style="grid-template-columns:110px 1fr"><span>الاسم</span><div>${esc(S.user.name)}</div><span>البريد</span><div class="en">${esc(S.user.email)}</div></div>
+    <div class="field"><label class="f" for="pn">الاسم الكامل <span style="color:var(--bad)">*</span></label><input type="text" id="pn" required maxlength="120" value="${esc(S.user.nameMissing?'':S.user.name)}" placeholder="الاسم كما في السجلات الجامعية"></div>
+    <div class="kv" style="grid-template-columns:110px 1fr"><span>البريد</span><div class="en">${esc(S.user.email)}</div></div>
     <div class="field"><label class="f" for="pm">رقم الجوال <span style="color:var(--bad)">*</span></label>
       <input type="tel" id="pm" dir="ltr" inputmode="tel" autocomplete="tel" required placeholder="05XXXXXXXX" value="${esc(S.user.mobile||'')}" style="text-align:left">
       <div class="hint">مثال: <span class="en">0501234567</span> — وتُقبل الأرقام الدولية بصيغة <span class="en">+XXXXXXXXXX</span></div><div class="err" id="pmErr"></div></div>
@@ -412,9 +428,10 @@ function openProfile(required){
   document.body.appendChild(ov); icons(); setTimeout(()=>$('#pm').focus(),50);
 }
 async function saveProfile(ev){
-  ev.preventDefault(); const v=$('#pm').value.trim();
+  ev.preventDefault(); const v=$('#pm').value.trim(); const nm=$('#pn').value.trim();
+  if(nm.length<3){ $('#pmErr').textContent='يرجى كتابة الاسم الكامل.'; return; }
   if(!mobileOk(v)){ $('#pmErr').textContent=ERR_AR.BAD_MOBILE; return; }
-  try{ const o=await api('saveProfile',{data:{mobile:v}}); S.user.mobile=o.mobile; $('#profileOv').remove(); toast('تم حفظ رقم الجوال'); if(S.view==='report') route(); }
+  try{ const o=await api('saveProfile',{data:{mobile:v,name:nm}}); S.user.mobile=o.mobile; S.user.name=o.name||nm; S.user.nameMissing=false; $('#uName').textContent=S.user.name; $('#profileOv').remove(); toast('تم حفظ رقم الجوال'); if(S.view==='report') route(); }
   catch(e){ $('#pmErr').textContent=e.message; }
 }
 const isStaff = () => S.user && (S.user.role==='tech' || S.user.role==='admin');
@@ -859,7 +876,7 @@ async function demoApi(action,p){
   switch(action){
     case 'login': { const user={email:'demo.user@sr.edu.sa',name:p.role==='tech'?'فني الشبكات (تجريبي)':'أحمد عبدالله',picture:'',role:p.role||'user',mobile:db.mobile||''}; S.user=user;
       return {ok:true,user,locations:db.L.map(b=>({building:b,college:''})),buildings:demoStatus(db),tickets:db.tickets.filter(t=>t.email===user.email)}; }
-    case 'saveProfile': { if(!mobileOk(p.data.mobile)) throw new Error(ERR_AR.BAD_MOBILE); db.mobile=demoNorm(p.data.mobile); demoSave(db); return {ok:true,mobile:db.mobile}; }
+    case 'saveProfile': { if(!mobileOk(p.data.mobile)) throw new Error(ERR_AR.BAD_MOBILE); db.mobile=demoNorm(p.data.mobile); demoSave(db); return {ok:true,mobile:db.mobile,name:p.data.name}; }
     case 'getStatus': return {ok:true,buildings:demoStatus(db)};
     case 'saveSpeedTest': db.tests.unshift({at:new Date().toISOString(),building:p.data.building,down:p.data.download,up:p.data.upload,ping:p.data.ping}); demoSave(db); return {ok:true};
     case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||(d.description||'').length<5) throw new Error(ERR_AR.MISSING_FIELDS);

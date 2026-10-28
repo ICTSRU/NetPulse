@@ -1,5 +1,18 @@
 # Changelog — SRU NetPulse
 
+## v2.2 — 2026-10-28
+### Fixed
+- **«الإبلاغ عن مشكلة» on mobile:** the form and the tips card were forced side by side, squeezing the form into a narrow strip; they now stack on screens ≤ 820 px. Inputs use 16 px text on mobile (no iOS zoom), cards have tighter padding, and the active tab scrolls into view in the mobile menu.
+- Mobile-number field now has the same styling as the other fields.
+### Changed
+- **وصف المشكلة is optional** (frontend and backend); empty descriptions show «—» in e-mails and the ticket panel.
+- **Missing required fields are highlighted:** red border and light-red background, label in red, a «هذا الحقل مطلوب» message under each field (or a format hint for an invalid mobile number), a summary alert at the top, and the page scrolls to the first missing field. The highlight clears as soon as the field is filled. Required: الكلية / الجهة، نوع المشكلة، المبنى، رقم الجوال.
+
+## v2.1 — 2026-10-28
+### Changed
+- University buildings updated to: مبنى 1 · مبنى 2 · مبنى 3 · مبنى 4 · شطر الطالبات · سكن الطلاب · سكن الطالبات (`setup` seed, demo data, monitoring example).
+- `Locations-v2.1.tsv` — ready-to-paste rows for the live Sheet's `Locations` tab (cell A2).
+
 ## v2.0 — 2026-10-13
 ### Added
 - **«المسؤول» is now a dropdown** of the ICTD team, grouped by unit (ICTD / ITOC / NOC / DSSC / AAU), showing name — title; «— غير مُسند —» option; «تعيين لي» picks your own entry.

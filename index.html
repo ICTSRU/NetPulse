@@ -97,7 +97,7 @@ main{flex:1;padding:20px;min-width:0}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 label.f{display:block;font-weight:700;font-size:13px;margin-bottom:4px}
 .field{margin-bottom:14px}
-input[type=text],input[type=datetime-local],input[type=search],select,textarea{width:100%;border:1px solid #d9cfe8;border-radius:var(--radius);padding:9px 11px;background:#fff;color:var(--ink)}
+input[type=text],input[type=tel],input[type=datetime-local],input[type=search],select,textarea{width:100%;border:1px solid #d9cfe8;border-radius:var(--radius);padding:9px 11px;background:#fff;color:var(--ink)}
 textarea{min-height:96px;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:2px solid rgba(80,30,140,.25);border-color:var(--purple)}
 .hint{font-size:12px;color:var(--muted)}
@@ -171,6 +171,13 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--purple);background:#fff;color:var(--purple);border-radius:var(--radius);padding:8px 12px;cursor:pointer;font-weight:700;font-family:inherit}
 .seg button.on{background:var(--purple);color:#fff}
+.report-grid{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}
+.star{color:var(--bad)}
+.field.invalid label.f{color:var(--bad)}
+.field.invalid select,.field.invalid input{border:2px solid var(--bad)!important;background:var(--bad-bg)!important}
+.field.invalid select:focus,.field.invalid input:focus{outline:2px solid rgba(198,40,40,.25)}
+.fmsg{display:none;color:var(--bad);font-size:12px;font-weight:700;margin-top:4px}
+.field.invalid .fmsg{display:block}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:var(--radius);z-index:60;font-weight:600}
 
 /* ---------- sign-in ---------- */
@@ -198,6 +205,10 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
   .side hr,.side .grp{display:none}
   .g2,.g3,.g4{grid-template-columns:1fr}
   .gauge-wrap{grid-template-columns:1fr}
+  .report-grid{grid-template-columns:1fr}
+  .card{padding:14px}
+  input,select,textarea{font-size:16px!important}  /* prevents iOS zoom on focus */
+  .toast{max-width:calc(100% - 32px);text-align:center}
   main{padding:14px}
   .band img{height:34px}
   .clock{display:none}
@@ -279,12 +290,12 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v2.0
+ * SRU NetPulse — Frontend v2.2
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '2.0',
+  VERSION: '2.2',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
@@ -500,6 +511,7 @@ function route(){
   if (!views[v] || (['team','tickets','netadmin'].includes(v) && !isStaff())) v='home';
   S.view = v;
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active', a.dataset.v===v));
+  const act=document.querySelector('#nav a.active'); if(act && window.innerWidth<=820) act.scrollIntoView({block:'nearest',inline:'center'});
   Object.values(S.charts).forEach(c=>c.destroy()); S.charts={};
   views[v]();
   icons();
@@ -666,21 +678,23 @@ function vReport(){
   let dept=''; try{ dept=localStorage.getItem('np_dept')||''; }catch(e){}
   $('#main').innerHTML = `
     ${head('file-warning','الإبلاغ عن مشكلة','ساعدنا في تحسين الخدمة من خلال الإبلاغ عن أي مشكلة في الإنترنت.')}
-    <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(260px,1fr)">
-      <form class="card" id="rform" onsubmit="submitReport(event)">
+    <div class="grid report-grid">
+      <form class="card" id="rform" novalidate onsubmit="submitReport(event)">
+        <div class="alert c-bad hidden" id="rerr"><i data-lucide="alert-circle"></i><span>يرجى تعبئة الحقول المطلوبة المظللة باللون الأحمر.</span></div>
         <div class="grid g2">
-          <div class="field"><label class="f">الكلية / الجهة <span style="color:var(--bad)">*</span></label><select id="rd" required>${deptOptions()}</select></div>
-          <div class="field"><label class="f">نوع المشكلة <span style="color:var(--bad)">*</span></label><select id="rt" required><option value="">— اختر —</option>${ISSUE_TYPES.map(t=>`<option ${t===p.issueType?'selected':''}>${t}</option>`).join('')}</select></div>
-          <div class="field"><label class="f">المبنى <span style="color:var(--bad)">*</span></label><select id="rb" required>${buildingOptions(p.building||myBuilding())}</select></div>
+          <div class="field req"><label class="f" for="rd">الكلية / الجهة <span class="star">*</span></label><select id="rd" required>${deptOptions()}</select></div>
+          <div class="field req"><label class="f" for="rt">نوع المشكلة <span class="star">*</span></label><select id="rt" required><option value="">— اختر —</option>${ISSUE_TYPES.map(t=>`<option ${t===p.issueType?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div class="field req"><label class="f" for="rb">المبنى <span class="star">*</span></label><select id="rb" required>${buildingOptions(p.building||myBuilding())}</select></div>
           <div class="field"><label class="f">الموقع التفصيلي</label><input type="text" id="rs" maxlength="120" placeholder="مثال: الدور الثاني — قاعة 214"></div>
           <div class="field"><label class="f">وقت المشكلة</label><input type="datetime-local" id="ro" value="${localInput()}"></div>
-          <div class="field"><label class="f" for="rm">رقم الجوال للتواصل <span style="color:var(--bad)">*</span></label><input type="tel" id="rm" dir="ltr" inputmode="tel" required placeholder="05XXXXXXXX" value="${esc(S.user.mobile||'')}" style="text-align:left"></div>
+          <div class="field req"><label class="f" for="rm">رقم الجوال للتواصل <span class="star">*</span></label><input type="tel" id="rm" dir="ltr" inputmode="tel" required placeholder="05XXXXXXXX" value="${esc(S.user.mobile||'')}" style="text-align:left"></div>
           <div class="field"><label class="f">نوع الاتصال</label><select id="rc">${['Wi-Fi','سلكي (Ethernet)','بيانات الجوال'].map(c=>`<option ${p.connection===c?'selected':''}>${c}</option>`).join('')}</select></div>
         </div>
-        <div class="field"><label class="f">وصف المشكلة <span style="color:var(--bad)">*</span></label>
-          <textarea id="rx" maxlength="500" required placeholder="صف المشكلة بإيجاز: متى بدأت، هل تتكرر، الأنظمة المتأثرة…" oninput="$('#rcnt').textContent=this.value.length+'/500'"></textarea>
+        <div class="field"><label class="f" for="rx">وصف المشكلة <span class="hint">(اختياري)</span></label>
+          <textarea id="rx" maxlength="500" placeholder="صف المشكلة بإيجاز: متى بدأت، هل تتكرر، الأنظمة المتأثرة…" oninput="$('#rcnt').textContent=this.value.length+'/500'"></textarea>
           <div class="hint en" id="rcnt">0/500</div></div>
-        <label class="row hint" style="margin-bottom:14px"><input type="checkbox" id="ra" ${S.lastTest?'checked':'disabled'}> إرفاق نتيجة آخر قياس ${S.lastTest?`(<span class="en">${S.lastTest.download} / ${S.lastTest.upload} Mbps — ${S.lastTest.ping} ms</span>)`:'(لا يوجد قياس — يُنصح بإجراء قياس أولًا)'}</label>
+        <div class="hint" style="margin-bottom:10px"><span class="star">*</span> حقل مطلوب</div>
+        <label class="row hint" style="margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="ra" ${S.lastTest?'checked':'disabled'}> إرفاق نتيجة آخر قياس ${S.lastTest?`(<span class="en">${S.lastTest.download} / ${S.lastTest.upload} Mbps — ${S.lastTest.ping} ms</span>)`:'(لا يوجد قياس — يُنصح بإجراء قياس أولًا)'}</label>
         <button class="btn block" id="rsend"><i data-lucide="send"></i>إرسال البلاغ</button>
       </form>
       <div id="rside" class="card">
@@ -694,14 +708,33 @@ function vReport(){
       </div>
     </div>`;
   if (dept) $('#rd').value = dept;
+  // clear the red highlight as soon as a required field is filled
+  document.querySelectorAll('#rform .field.req select, #rform .field.req input').forEach(el =>
+    ['input','change'].forEach(evt => el.addEventListener(evt, () => { if (fieldOk(el)) el.closest('.field').classList.remove('invalid'); })));
+}
+function fieldOk(el){ return el.id==='rm' ? mobileOk(el.value.trim()) : !!String(el.value).trim(); }
+/* Highlight every missing/invalid required field; returns true when the form is complete */
+function validateReport(){
+  let first=null;
+  document.querySelectorAll('#rform .field.req').forEach(f => {
+    const el=f.querySelector('select,input'); const ok=fieldOk(el);
+    f.classList.toggle('invalid', !ok);
+    let m=f.querySelector('.fmsg');
+    if(!ok){ if(!m){ m=document.createElement('div'); m.className='fmsg'; f.appendChild(m); }
+      m.textContent = el.id==='rm' && el.value.trim() ? 'رقم الجوال غير صحيح — استخدم الصيغة 05XXXXXXXX' : 'هذا الحقل مطلوب';
+      if(!first) first=el; }
+  });
+  $('#rerr').classList.toggle('hidden', !first);
+  if(first){ first.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>first.focus({preventScroll:true}),350); }
+  return !first;
 }
 async function submitReport(ev){
   ev.preventDefault();
+  if (!validateReport()) return;
   const b=$('#rsend'); b.disabled=true; b.innerHTML='جارٍ الإرسال…';
   const data = { department:$('#rd').value, issueType:$('#rt').value, building:$('#rb').value, spot:$('#rs').value.trim(),
     occurredAt: $('#ro').value ? new Date($('#ro').value).toISOString() : '', connection:$('#rc').value,
     description:$('#rx').value.trim(), mobile:$('#rm').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping} : null };
-  if (!mobileOk(data.mobile)) { toast(ERR_AR.BAD_MOBILE); b.disabled=false; b.innerHTML='<i data-lucide="send"></i>إرسال البلاغ'; icons(); return; }
   try {
     try{ localStorage.setItem('np_dept', data.department); }catch(e){}
     setMyBuilding(data.building);
@@ -747,7 +780,7 @@ async function openTicket(id){
         <span>نوع المشكلة</span><div>${esc(t.issueType)} <span class="hint">(${esc(t.connection||'')})</span></div>
         <span>وقت المشكلة</span><div>${fmtDT(t.occurredAt)}</div>
         <span>وقت البلاغ</span><div>${fmtDT(t.createdAt)}</div>
-        <span>الوصف</span><div>${esc(t.description)}</div>
+        <span>الوصف</span><div>${esc(t.description||'—')}</div>
         ${t.test?`<span>القياس المرفق</span><div class="en">↓ ${t.test.download} · ↑ ${t.test.upload} Mbps · ${t.test.ping} ms</div>`:''}
         ${t.assignee?`<span>المسؤول</span><div>${esc(t.assignee)}</div>`:''}
         ${t.resolution?`<span>الحل</span><div>${esc(t.resolution)}</div>`:''}
@@ -926,7 +959,7 @@ function vNetAdmin(){
   "key": "MONITOR_KEY",
   "source": "zabbix",
   "items": [
-    {"building":"مبنى كلية الطب","status":"slow",
+    {"building":"مبنى 1","status":"slow",
      "note":"Uplink utilization 92%"}
   ]
 }</pre>
@@ -945,14 +978,14 @@ function demoDB(){
   let db; try { db = JSON.parse(localStorage.getItem('np_demo')||'null'); } catch(e){}
   if (db && db.v===CONFIG.VERSION) return db;
   const now=Date.now(), h=36e5;
-  const L=['مبنى كلية الطب','مبنى كلية التمريض','مبنى كلية العلوم التطبيقية','مبنى كلية الأعمال','المبنى الإداري','المكتبة','شطر الطالبات','السكن الجامعي'];
+  const L=['مبنى 1', 'مبنى 2', 'مبنى 3', 'مبنى 4', 'شطر الطالبات', 'سكن الطلاب', 'سكن الطالبات'];
   const mk=(n,hrs,b,type,st,name,desc,resp)=>({id:'NP-'+n,createdAt:new Date(now-hrs*h).toISOString(),email:'demo.user@sr.edu.sa',name,department:'كلية الطب',building:b,spot:'',issueType:type,connection:'Wi-Fi',occurredAt:new Date(now-hrs*h).toISOString(),description:desc,status:st,priority:type==='انقطاع كامل'?'high':'medium',mobile:'+96650000'+String(1000+n).slice(-4),assignee:st==='open'?'':'فريق الشبكات',firstResponseAt:resp?new Date(now-(hrs-resp)*h).toISOString():'',resolvedAt:st==='resolved'?new Date(now-(hrs-resp-2)*h).toISOString():'',updatedAt:new Date(now-hrs*h).toISOString(),resolution:st==='resolved'?'تم استبدال نقطة الوصول اللاسلكية':'',test:{download:6.2,upload:3.1,ping:48}});
   const tickets=[];
   const types=['بطء الإنترنت','انقطاع متقطع','ضعف إشارة Wi-Fi','انقطاع كامل'];
   for(let i=0;i<34;i++){ const hrs=6+i*19; tickets.push(mk(1010+i,hrs,L[i%L.length],types[i%4],i<4?(['open','review','progress','open'][i]):(i%7===0?'closed':'resolved'),['أحمد عبدالله','سارة محمد','خالد علي','نورة سعد'][i%4],'يوجد بطء ملحوظ في تصفح الإنترنت ويؤثر على استخدام الأنظمة التعليمية.',0.3+i%3*0.4)); }
   db={v:CONFIG.VERSION,tickets,log:tickets.map(t=>({at:t.createdAt,ticketId:t.id,action:'created',status:'open',note:'',by:t.email})),
     tests:Array.from({length:60},(_,i)=>({at:new Date(now-i*2.5*h).toISOString(),building:L[i%L.length],down:+(8+Math.random()*60).toFixed(1),up:+(4+Math.random()*25).toFixed(1),ping:Math.round(15+Math.random()*50)})),
-    stat:{'مبنى كلية الطب':{status:'slow',source:'monitoring',note:'استخدام الوصلة الرئيسية 92%',updatedAt:new Date(now-0.4*h).toISOString()},'مبنى كلية الأعمال':{status:'warn',source:'manual',note:'متابعة ضعف الإشارة في الدور الثاني',updatedAt:new Date(now-h).toISOString()}},
+    stat:{'مبنى 1':{status:'slow',source:'monitoring',note:'استخدام الوصلة الرئيسية 92%',updatedAt:new Date(now-0.4*h).toISOString()},'مبنى 3':{status:'warn',source:'manual',note:'متابعة ضعف الإشارة في الدور الثاني',updatedAt:new Date(now-h).toISOString()}},
     L, seq:1043, feedback: tickets.filter((t,i)=>t.status==='resolved'&&i%3===0).map((t,i)=>({at:t.resolvedAt||t.updatedAt,ticketId:t.id,answer:i%4===1?'no':'yes',note:i%4===1?'ما زال البطء موجودًا بعد الظهر':'',building:t.building,issueType:t.issueType}))};
   demoSave(db); return db;
 }
@@ -966,7 +999,7 @@ function demoStatus(db){
     const s=db.stat[b]; const fresh=s && now-new Date(s.updatedAt)<6*36e5;
     let status='unknown';
     if(!fresh){ if(open>=3||(bt.length>=3&&med<5))status='slow'; else if(open>=1||(bt.length>=3&&med<15))status='warn'; else if(bt.length)status='ok'; }
-    return {building:b,college:b.startsWith('مبنى ')?b.slice(5):'',status:fresh?s.status:status,source:fresh?s.source:'estimate',note:fresh?s.note:'',updatedAt:fresh?s.updatedAt:(bt.length?new Date().toISOString():''),tests24h:bt.length,medianDown:Math.round(med*10)/10,openTickets:open};
+    return {building:b,college:'',status:fresh?s.status:status,source:fresh?s.source:'estimate',note:fresh?s.note:'',updatedAt:fresh?s.updatedAt:(bt.length?new Date().toISOString():''),tests24h:bt.length,medianDown:Math.round(med*10)/10,openTickets:open};
   });
 }
 async function demoApi(action,p){
@@ -980,7 +1013,7 @@ async function demoApi(action,p){
     case 'saveProfile': { if(!mobileOk(p.data.mobile)) throw new Error(ERR_AR.BAD_MOBILE); db.mobile=demoNorm(p.data.mobile); demoSave(db); return {ok:true,mobile:db.mobile,name:p.data.name}; }
     case 'getStatus': return {ok:true,buildings:demoStatus(db)};
     case 'saveSpeedTest': db.tests.unshift({at:new Date().toISOString(),building:p.data.building,down:p.data.download,up:p.data.upload,ping:p.data.ping}); demoSave(db); return {ok:true};
-    case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||(d.description||'').length<5) throw new Error(ERR_AR.MISSING_FIELDS);
+    case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||!d.department) throw new Error(ERR_AR.MISSING_FIELDS);
       const id='NP-'+(++db.seq); const now=new Date().toISOString();
       if(!mobileOk(d.mobile)) throw new Error(ERR_AR.BAD_MOBILE); if(!db.mobile) db.mobile=demoNorm(d.mobile);
       db.tickets.unshift({id,mobile:demoNorm(d.mobile),createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test});

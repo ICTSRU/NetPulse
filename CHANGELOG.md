@@ -1,5 +1,11 @@
 # Changelog — SRU NetPulse
 
+## v2.3 — 2026-10-28
+### Added
+- **«سياسة الاستخدام العادل»** in the side menu (visible to all users) → page for policy **ICTD-025P — سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت** (v1.1): document details (code, version, issue/review dates, owner, classification, status), 13-section table of contents, four key-point cards, embedded PDF viewer (desktop), «فتح السياسة» and «تحميل PDF» buttons, and a link to report a blocked service or request an exception (section 7).
+- `assets/docs/ICTD-025P-Fair-Use-Internet-Access-Policy.pdf` (GitHub hosting uses it directly).
+- Script property `POLICY_URL` (Apps Script hosting): Google Drive link to the PDF; Drive links are converted automatically to preview/download URLs.
+
 ## v2.2 — 2026-10-28
 ### Fixed
 - **«الإبلاغ عن مشكلة» on mobile:** the form and the tips card were forced side by side, squeezing the form into a narrow strip; they now stack on screens ≤ 820 px. Inputs use 16 px text on mobile (no iOS zoom), cards have tighter padding, and the active tab scrolls into view in the mobile menu.

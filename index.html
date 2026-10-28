@@ -232,9 +232,9 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 <!-- ===================== ITOC SIGN-IN SCREEN ===================== -->
 <section id="signin">
   <div class="band">
-    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'جامعة سليمان الراجحي'}))">
+    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="var x=document.createElement('span');x.className='logo-fallback';x.textContent='جامعة سليمان الراجحي';this.replaceWith(x)">
     <div class="ttl"><img class="np-lockup" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse"></div>
-    <img src="assets/ictd-logo.png" alt="الإدارة التنفيذية للاتصالات وتقنية المعلومات" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'ICTD'}))">
+    <img src="assets/ictd-logo.png" alt="الإدارة التنفيذية للاتصالات وتقنية المعلومات" onerror="var x=document.createElement('span');x.className='logo-fallback';x.textContent='ICTD';this.replaceWith(x)">
   </div>
   <div class="wrap">
     <div class="signcard">
@@ -264,9 +264,9 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 <!-- ===================== APP ===================== -->
 <section id="app" class="hidden">
   <div class="band">
-    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'جامعة سليمان الراجحي'}))">
+    <img src="assets/sru-logo.png" alt="جامعة سليمان الراجحي" onerror="var x=document.createElement('span');x.className='logo-fallback';x.textContent='جامعة سليمان الراجحي';this.replaceWith(x)">
     <div class="ttl"><img class="np-lockup" src="assets/brand/svg/netpulse-lockup.svg" alt="نبض الشبكة — SRU NetPulse"></div>
-    <img src="assets/ictd-logo.png" alt="ICTD" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-fallback',textContent:'ICTD'}))">
+    <img src="assets/ictd-logo.png" alt="ICTD" onerror="var x=document.createElement('span');x.className='logo-fallback';x.textContent='ICTD';this.replaceWith(x)">
   </div>
   <div id="demoBanner" class="demo-banner hidden">وضع العرض التجريبي — البيانات محفوظة في هذا المتصفح فقط. اضبط <b class="en">API_URL</b> و<b class="en">CLIENT_ID</b> لربط المنصة بـ Google Sheets.</div>
   <div class="topbar">
@@ -300,14 +300,86 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
   </footer>
 </section>
 
+<template id="tplPolicy">
+  <h2 class="view-title"><i data-lucide="shield-check"></i>سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت</h2>
+  <p class="view-sub">تنظّم استخدام الإنترنت والتطبيقات على شبكة الجامعة لضمان جودة الخدمة وعدالة توزيعها وحماية الشبكة.</p>
+  <div class="grid policy-grid">
+    <div class="card">
+      <div class="row" style="align-items:flex-start">
+        <div style="flex:1;min-width:220px">
+          <div class="hint en" style="text-align:right">Fair Use and Internet Access Control Policy</div>
+          <h3 style="margin-top:4px">سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت</h3>
+        </div>
+        <div class="row" id="polButtons">
+          <a class="btn" id="polOpen" href="#" target="_blank" rel="noopener">فتح السياسة</a>
+          <a class="btn sec" id="polDownload" href="#" target="_blank" rel="noopener" download>تحميل PDF</a>
+        </div>
+      </div>
+      <div class="grid g4" style="margin-top:14px">
+        <div class="pol-hl"><b>الاستخدام العادل</b><span>توزيع متوازن للنطاق الترددي بين جميع المستخدمين، مع أولوية للخدمات الأكاديمية والتعليمية والإدارية.</span></div>
+        <div class="pol-hl"><b>قيود زمنية</b><span>قد تُتاح بعض التطبيقات والتحديثات في أوقات محددة وفق الجداول المعتمدة.</span></div>
+        <div class="pol-hl"><b>لا لتجاوز الحماية</b><span>يُمنع استخدام خدمات VPN أو Proxy أو أي أدوات لتجاوز ضوابط الحماية.</span></div>
+        <div class="pol-hl"><b>مراقبة الأداء</b><span>متابعة أداء الشبكة والأحداث الأمنية وفق ضوابط الهيئة الوطنية للأمن السيبراني (NCA) مع حماية الخصوصية.</span></div>
+      </div>
+      <div id="polViewerWrap">
+        <div class="pol-viewer"><iframe id="polFrame" title="سياسة الاستخدام العادل" loading="lazy"></iframe></div>
+        <p class="hint pol-mobile">على الجوال: اضغط «فتح السياسة» لعرض المستند كاملًا.</p>
+      </div>
+      <div class="alert c-warn" id="polMissing" style="margin-top:14px"><span id="polMissingText"></span></div>
+    </div>
+    <div>
+      <div class="card">
+        <h3>بيانات الوثيقة</h3>
+        <div class="kv" style="grid-template-columns:110px 1fr;margin:8px 0 0">
+          <span>رمز السياسة</span><div class="en">ICTD-025P</div>
+          <span>رقم الإصدار</span><div class="en">1.1</div>
+          <span>تاريخ الإصدار</span><div>15 أكتوبر 2026</div>
+          <span>المراجعة القادمة</span><div>1 نوفمبر 2026 (عند الحاجة)</div>
+          <span>الجهة المالكة</span><div>الإدارة التنفيذية للاتصالات وتقنية المعلومات</div>
+          <span>التصنيف</span><div><span class="chip c-info">عام</span></div>
+          <span>الحالة</span><div><span class="chip c-warn">مسودة</span></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>محتويات السياسة</h3>
+        <ol class="pol-toc">
+          <li>الغرض</li><li>النطاق</li><li>المرجعيات النظامية والمعايير</li><li>السياسات</li>
+          <li>مصفوفة ضوابط التحكم في الوصول إلى الإنترنت والتطبيقات</li><li>الإجراءات</li>
+          <li>الاستثناءات وطلبات الإعفاء</li><li>الإنفاذ والامتثال</li><li>الأدوار والمسؤوليات</li>
+          <li>السياسات ذات العلاقة</li><li>المصطلحات والتعريفات</li><li>تاريخ المراجعة</li><li>اعتماد الوثيقة</li>
+        </ol>
+      </div>
+      <div class="card" style="margin-top:16px;background:var(--purple-light)">
+        <p class="hint" style="margin:0">لديك ملاحظة أو تواجه حظرًا لخدمة تحتاجها في عملك أو دراستك؟ <a href="#report">أرسل بلاغًا</a> واذكر الخدمة في الوصف، أو قدّم طلب استثناء وفق البند 7 من السياسة.</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+/* Boot watchdog + error capture — shows the first script error on screen instead of hanging silently */
+window.__npErrs = [];
+window.addEventListener('error', function (e) {
+  window.__npErrs.push(String(e.message || (e.target && e.target.src ? 'تعذّر تحميل: ' + e.target.src : 'خطأ')) +
+    (e.lineno ? ' — line ' + e.lineno + ':' + e.colno : ''));
+}, true);
+setTimeout(function(){
+  if (window.__npBoot) return;
+  var e = document.getElementById('signErr');
+  var scriptErr = window.__npErrs.filter(function (x) { return x.indexOf('line') > -1; })[0] || window.__npErrs[0] || 'لم يُسجَّل خطأ';
+  if (e) e.innerHTML = 'تعذّر تشغيل المنصة. أعد تحميل الصفحة، وإن تكرر ذلك فأبلغ مركز عمليات تقنية المعلومات (ITOC).' +
+    '<div dir="ltr" style="margin-top:8px;font:12px/1.5 monospace;color:#7a1a1a;background:#fdecec;padding:6px 8px;border-radius:4px;text-align:left;word-break:break-word">' +
+    String(scriptErr).replace(/[<>&]/g, '') + '</div>';
+}, 6000);
+</script>
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v2.3
+ * SRU NetPulse — Frontend v2.9
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '2.3',
+  VERSION: '2.9',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],
@@ -375,6 +447,7 @@ async function api(action, payload={}){
 
 /* ---------------- Auth (Google Identity Services) ---------------- */
 function initSignin(){
+  window.__npBoot = true;
   document.querySelectorAll('.appver').forEach(e=>e.textContent=CONFIG.VERSION);
   icons();
   if (DEMO) { $('#demoEntry').classList.remove('hidden'); $('#gbtn').innerHTML='<span class="hint">وضع العرض التجريبي</span>'; return; }
@@ -858,49 +931,27 @@ async function saveTicket(ev,id){
   } catch(e){ toast(e.message); btn.disabled=false; btn.innerHTML='<i data-lucide="save"></i>حفظ وإرسال'; icons(); }
 }
 
-/* ----- Fair-use & internet access control policy (ICTD-025P) ----- */
-const POLICY = {
-  code:'ICTD-025P', version:'1.1', title:'سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت',
-  en:'Fair Use and Internet Access Control Policy', issued:'15 أكتوبر 2026', review:'1 نوفمبر 2026 (عند الحاجة)',
-  owner:'الإدارة التنفيذية للاتصالات وتقنية المعلومات', classification:'عام', status:'مسودة',
-  toc:['الغرض','النطاق','المرجعيات النظامية والمعايير','السياسات','مصفوفة ضوابط التحكم في الوصول إلى الإنترنت والتطبيقات','الإجراءات',
-       'الاستثناءات وطلبات الإعفاء','الإنفاذ والامتثال','الأدوار والمسؤوليات','السياسات ذات العلاقة','المصطلحات والتعريفات','تاريخ المراجعة','اعتماد الوثيقة'],
-  highlights:[
-    ['gauge','الاستخدام العادل','توزيع متوازن للنطاق الترددي بين جميع المستخدمين، مع أولوية للخدمات الأكاديمية والتعليمية والإدارية.'],
-    ['clock','قيود زمنية','قد تُتاح بعض التطبيقات والتحديثات في أوقات محددة وفق الجداول المعتمدة.'],
-    ['shield-off','لا لتجاوز الحماية','يُمنع استخدام خدمات VPN أو Proxy أو أي أدوات لتجاوز ضوابط الحماية.'],
-    ['activity','مراقبة الأداء','متابعة أداء الشبكة والأحداث الأمنية وفق ضوابط الهيئة الوطنية للأمن السيبراني (NCA) مع حماية الخصوصية.']
-  ]
-};
+/* ----- Fair-use & internet access control policy (ICTD-025P) -----
+   The page markup is static HTML in <template id="tplPolicy"> (no JS templates — safer under Apps Script). */
 function policyLinks(u){
-  if(!u) return null;
-  const m = u.match(/\/file\/d\/([\w-]+)/) || u.match(/[?&]id=([\w-]+)/);
-  if (m) return { view:`https://drive.google.com/file/d/${m[1]}/view`, embed:`https://drive.google.com/file/d/${m[1]}/preview`, download:`https://drive.google.com/uc?export=download&id=${m[1]}` };
-  return { view:u, embed:u + '#view=FitH', download:u };
+  if (!u) return null;
+  var id = '', k = u.indexOf('/file/d/');
+  if (k > -1) id = u.slice(k + 8).split('/')[0].split('?')[0];
+  else if (u.indexOf('id=') > -1) id = u.split('id=')[1].split('&')[0];
+  if (id) return { view: 'https://drive.google.com/file/d/' + id + '/view', embed: 'https://drive.google.com/file/d/' + id + '/preview', download: 'https://drive.google.com/uc?export=download&id=' + id };
+  return { view: u, embed: u + '#view=FitH', download: u };
 }
 function vPolicy(){
-  const L = policyLinks(S.policyUrl);
-  const meta = [['رمز السياسة',`<span class="en">${POLICY.code}</span>`],['رقم الإصدار',`<span class="en">${POLICY.version}</span>`],['تاريخ الإصدار',POLICY.issued],
-    ['المراجعة القادمة',POLICY.review],['الجهة المالكة',POLICY.owner],['التصنيف',`<span class="chip c-info">${POLICY.classification}</span>`],['الحالة',`<span class="chip c-warn">${POLICY.status}</span>`]];
-  $('#main').innerHTML = `
-    ${head('shield-check','سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت','تنظّم استخدام الإنترنت والتطبيقات على شبكة الجامعة لضمان جودة الخدمة وعدالة توزيعها وحماية الشبكة.')}
-    <div class="grid policy-grid">
-      <div class="card">
-        <div class="row" style="align-items:flex-start">
-          <div style="flex:1;min-width:220px"><div class="hint en" style="text-align:right">${POLICY.en}</div><h3 style="margin-top:4px">${POLICY.title}</h3></div>
-          ${L?`<div class="row"><a class="btn" href="${esc(L.view)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i>فتح السياسة</a><a class="btn sec" href="${esc(L.download)}" target="_blank" rel="noopener" download><i data-lucide="download"></i>تحميل PDF</a></div>`:''}
-        </div>
-        <div class="grid g4" style="margin-top:14px">${POLICY.highlights.map(h=>`<div class="pol-hl"><i data-lucide="${h[0]}"></i><b>${h[1]}</b><span>${h[2]}</span></div>`).join('')}</div>
-        ${L ? `<div class="pol-viewer"><iframe src="${esc(L.embed)}" title="${esc(POLICY.title)}" loading="lazy"></iframe></div>
-               <p class="hint pol-mobile">على الجوال: اضغط «فتح السياسة» لعرض المستند كاملًا.</p>`
-            : `<div class="alert c-warn" style="margin-top:14px"><i data-lucide="info"></i>${isStaff()?'لم يُضبط رابط ملف السياسة بعد — أضف خاصية <b class="en">POLICY_URL</b> في Script properties برابط الملف على Google Drive.':'ملف السياسة غير متاح حاليًا.'}</div>`}
-      </div>
-      <div>
-        <div class="card"><h3><i data-lucide="file-text"></i>بيانات الوثيقة</h3><div class="kv" style="grid-template-columns:110px 1fr;margin:8px 0 0">${meta.map(r=>`<span>${r[0]}</span><div>${r[1]}</div>`).join('')}</div></div>
-        <div class="card" style="margin-top:16px"><h3><i data-lucide="list"></i>محتويات السياسة</h3><ol class="pol-toc">${POLICY.toc.map(t=>`<li>${t}</li>`).join('')}</ol></div>
-        <div class="card" style="margin-top:16px;background:var(--purple-light)"><p class="hint" style="margin:0">لديك ملاحظة أو تواجه حظرًا لخدمة تحتاجها في عملك أو دراستك؟ <a href="#report">أرسل بلاغًا</a> واذكر الخدمة في الوصف، أو قدّم طلب استثناء وفق البند 7 من السياسة.</p></div>
-      </div>
-    </div>`;
+  $('#main').innerHTML = document.getElementById('tplPolicy').innerHTML;
+  var L = policyLinks(S.policyUrl);
+  if (L) {
+    $('#polOpen').href = L.view; $('#polDownload').href = L.download;
+    $('#polFrame').src = L.embed;
+    $('#polMissing').classList.add('hidden');
+  } else {
+    $('#polButtons').classList.add('hidden'); $('#polViewerWrap').classList.add('hidden');
+    $('#polMissingText').textContent = isStaff() ? 'لم يُضبط رابط ملف السياسة بعد — أضف خاصية POLICY_URL في Script properties برابط الملف على Google Drive.' : 'ملف السياسة غير متاح حاليًا.';
+  }
 }
 
 /* ----- Network status view ----- */

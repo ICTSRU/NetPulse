@@ -1,5 +1,50 @@
 # Changelog — SRU NetPulse
 
+## v2.9 — 2026-10-28
+### Fixed
+- **Frozen sign-in screen — definitive fix, verified against the live deployment.** Decoding the page Apps Script actually delivers showed that its `//`-comment stripper cut line 564 (`'https://drive.google.com/…'`) even inside an ordinary quoted string, while other URLs survived, so its quote tracking is unreliable. v2.8 removed one trigger but not the mechanism.
+- `backend/Index.html` is now **hardened at build time** with a real JavaScript tokenizer (acorn): all comments are removed, and every `/` that forms `//` or is written `\/` inside strings, templates and regex literals is written as `\x2F` (identical value). The scripts contain **no `//` at all**, so there is nothing left for Apps Script to strip.
+### Verified
+- A crude stripper that cuts at every `//` regardless of quotes leaves v2.9 **byte-identical**; the same stripper reproduces the live v2.8 error.
+- All nine screens, report validation, ticket creation and status update work in the hardened file; the policy page builds its Drive links correctly.
+### Build
+- `tools/build-index.py` (+ `tools/jsguard.py`, `tools/node/harden.js`, needs `npm install` in `tools/node`) — generates and hardens `backend/Index.html`; fails if any `//` remains.
+
+## v2.8 — 2026-10-28
+### Fixed
+- **Actual root cause of the frozen sign-in screen (since v2.3), confirmed on the live deployment.** Apps Script strips `//` line comments from inline scripts but does not recognise JavaScript template literals. In `policyLinks()` the URL `` `https://drive.google.com/…` `` (inside backticks) was cut at `//`, leaving an unclosed backtick, so the next `<span class=…>` was parsed as code → `SyntaxError: Unexpected token 'class'`. The v2.7 rename (`classification` → `docClass`) was based on a wrong diagnosis and did not address this.
+### Changed
+- Policy page moved to static HTML (`<template id="tplPolicy">`); JavaScript only fills in the PDF links, built with plain `'…'` strings.
+### Added
+- `tools/jsguard.py` + build guard: the build fails if any `//` appears inside a template literal. Verified: flags v2.3/v2.7, passes v2.2 and v2.8. The v2.7 `class` guard was removed.
+
+## v2.7 — 2026-10-28
+### Fixed
+- **Root cause of the frozen sign-in screen (since v2.3).** Apps Script writes the page with `document.write`, and that step corrupted the object key `classification:` in the policy data, raising `SyntaxError: Unexpected token 'class'` and stopping the whole page script. Renamed to `docClass`.
+- Image `onerror` fallbacks rewritten to avoid `{className:` (same risk).
+### Added
+- Build guard in `tools/build-index.py`: the build fails if `index.html` contains a word beginning with `class` that is not preceded by `.`.
+
+## v2.6 — 2026-10-28
+### Added
+- Sign-in screen diagnostics: the first JavaScript error (message + line:column) is captured and shown on the card when the page fails to start (watchdog after 6 s).
+### Changed
+- Global `POLICY` renamed to `NP_POLICY` to avoid a possible name clash with code Google injects into the Apps Script page.
+
+## v2.5 — 2026-10-28
+### Fixed
+- **False «المنصة غير جاهزة» page.** The v2.4 integrity check looked for an HTML-comment marker at the end of `Index`, but HtmlService strips HTML comments, so a complete file was reported as incomplete. The check now uses markers inside script code: `initSignin();` (file not cut) and `window.NP_END = 'x.y'` (version match). An `Index` without `NP_END` is served normally.
+
+## v2.4 — 2026-10-28
+### Fixed
+- **Sign-in stuck on the ITOC screen (Apps Script hosting).** `backend/Index.html` carried each logo twice as single lines of up to 59,000 characters; copying it into the Apps Script editor could silently cut a line, which broke the page script (empty version badge, no sign-in, missing university logo).
+  - `Index.html` rebuilt paste-safe: 152 KB instead of 465 KB, longest line 826 characters, each logo stored once in short chunks.
+  - Logos load from a separate script **after** the main script, so a logo problem can never block sign-in.
+### Added
+- **Integrity check in `doGet`:** if `Index` is incomplete or its version differs from `Code.gs`, the platform shows a clear Arabic message explaining the fix instead of a frozen screen (end marker `<!-- NP-END-OF-FILE vX.Y -->`).
+- **Boot watchdog** on the sign-in screen: if the page script has not started within 8 seconds, a message appears instead of an endless wait.
+- `tools/build-index.py` — regenerates `backend/Index.html` from `index.html`.
+
 ## v2.3 — 2026-10-28
 ### Added
 - **«سياسة الاستخدام العادل»** in the side menu (visible to all users) → page for policy **ICTD-025P — سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت** (v1.1): document details (code, version, issue/review dates, owner, classification, status), 13-section table of contents, four key-point cards, embedded PDF viewer (desktop), «فتح السياسة» and «تحميل PDF» buttons, and a link to report a blocked service or request an exception (section 7).

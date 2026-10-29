@@ -185,6 +185,9 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .pol-viewer{margin-top:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden;height:78vh;min-height:520px;background:#f3f0f8}
 .pol-viewer iframe{width:100%;height:100%;border:0;display:block}
 .pol-mobile{display:none}
+.pol-full{height:calc(100vh - 140px);min-height:640px}
+.pol-note{display:flex;gap:10px;align-items:flex-start;margin-top:16px;background:var(--purple-light);border-radius:8px;padding:12px 14px;font-size:15px;line-height:1.8}
+.pol-note svg{flex-shrink:0;margin-top:4px;color:var(--purple)}
 .pol-toc{margin:8px 0 0;padding-inline-start:22px;line-height:2;font-size:14px}
 /* Glowing «سياسة الاستخدام العادل» menu item */
 .side a.glow{position:relative;border:1px solid rgba(92,200,240,.75);background:rgba(27,163,214,.18);opacity:1;
@@ -322,56 +325,29 @@ footer .ver{background:var(--purple-light);color:var(--purple);padding:2px 8px;b
 <template id="tplPolicy">
   <h2 class="view-title"><i data-lucide="shield-check"></i>سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت</h2>
   <p class="view-sub">تنظّم استخدام الإنترنت والتطبيقات على شبكة الجامعة لضمان جودة الخدمة وعدالة توزيعها وحماية الشبكة.</p>
-  <div class="grid policy-grid">
-    <div class="card">
-      <div class="row" style="align-items:flex-start">
-        <div style="flex:1;min-width:220px">
-          <div class="hint en" style="text-align:right">Fair Use and Internet Access Control Policy</div>
-          <h3 style="margin-top:4px">سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت</h3>
-        </div>
-        <div class="row" id="polButtons">
-          <a class="btn" id="polOpen" href="#" target="_blank" rel="noopener">فتح السياسة</a>
-          <a class="btn sec" id="polDownload" href="#" target="_blank" rel="noopener" download>تحميل PDF</a>
-        </div>
+  <div class="card">
+    <div class="row" style="align-items:flex-start">
+      <div style="flex:1;min-width:220px">
+        <div class="hint en" style="text-align:right">Fair Use and Internet Access Control Policy · ICTD-025P · v1.1</div>
+        <h3 style="margin-top:4px">سياسة الاستخدام العادل والتحكم في الوصول إلى الإنترنت</h3>
       </div>
-      <div class="grid g4" style="margin-top:14px">
-        <div class="pol-hl"><b>الاستخدام العادل</b><span>توزيع متوازن للنطاق الترددي بين جميع المستخدمين، مع أولوية للخدمات الأكاديمية والتعليمية والإدارية.</span></div>
-        <div class="pol-hl"><b>قيود زمنية</b><span>قد تُتاح بعض التطبيقات والتحديثات في أوقات محددة وفق الجداول المعتمدة.</span></div>
-        <div class="pol-hl"><b>لا لتجاوز الحماية</b><span>يُمنع استخدام خدمات VPN أو Proxy أو أي أدوات لتجاوز ضوابط الحماية.</span></div>
-        <div class="pol-hl"><b>مراقبة الأداء</b><span>متابعة أداء الشبكة والأحداث الأمنية وفق ضوابط الهيئة الوطنية للأمن السيبراني (NCA) مع حماية الخصوصية.</span></div>
-      </div>
-      <div id="polViewerWrap">
-        <div class="pol-viewer"><iframe id="polFrame" title="سياسة الاستخدام العادل" loading="lazy"></iframe></div>
-        <p class="hint pol-mobile">على الجوال: اضغط «فتح السياسة» لعرض المستند كاملًا.</p>
-      </div>
-      <div class="alert c-warn" id="polMissing" style="margin-top:14px"><span id="polMissingText"></span></div>
-    </div>
-    <div>
-      <div class="card">
-        <h3>بيانات الوثيقة</h3>
-        <div class="kv" style="grid-template-columns:110px 1fr;margin:8px 0 0">
-          <span>رمز السياسة</span><div class="en">ICTD-025P</div>
-          <span>رقم الإصدار</span><div class="en">1.1</div>
-          <span>تاريخ الإصدار</span><div>15 أكتوبر 2026</div>
-          <span>المراجعة القادمة</span><div>1 نوفمبر 2026 (عند الحاجة)</div>
-          <span>الجهة المالكة</span><div>الإدارة التنفيذية للاتصالات وتقنية المعلومات</div>
-          <span>التصنيف</span><div><span class="chip c-info">عام</span></div>
-          <span>الحالة</span><div><span class="chip c-warn">مسودة</span></div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <h3>محتويات السياسة</h3>
-        <ol class="pol-toc">
-          <li>الغرض</li><li>النطاق</li><li>المرجعيات النظامية والمعايير</li><li>السياسات</li>
-          <li>مصفوفة ضوابط التحكم في الوصول إلى الإنترنت والتطبيقات</li><li>الإجراءات</li>
-          <li>الاستثناءات وطلبات الإعفاء</li><li>الإنفاذ والامتثال</li><li>الأدوار والمسؤوليات</li>
-          <li>السياسات ذات العلاقة</li><li>المصطلحات والتعريفات</li><li>تاريخ المراجعة</li><li>اعتماد الوثيقة</li>
-        </ol>
-      </div>
-      <div class="card" style="margin-top:16px;background:var(--purple-light)">
-        <p class="hint" style="margin:0">لديك ملاحظة أو تواجه حظرًا لخدمة تحتاجها في عملك أو دراستك؟ <a href="#report">أرسل بلاغًا</a> واذكر الخدمة في الوصف، أو قدّم طلب استثناء وفق البند 7 من السياسة.</p>
+      <div class="row" id="polButtons">
+        <a class="btn" id="polOpen" href="#" target="_blank" rel="noopener">فتح السياسة</a>
+        <a class="btn sec" id="polDownload" href="#" target="_blank" rel="noopener" download>تحميل PDF</a>
       </div>
     </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="pol-hl"><b>الاستخدام العادل</b><span>توزيع متوازن للنطاق الترددي بين جميع المستخدمين، مع أولوية للخدمات الأكاديمية والتعليمية والإدارية.</span></div>
+      <div class="pol-hl"><b>قيود زمنية</b><span>قد تُتاح بعض التطبيقات والتحديثات في أوقات محددة وفق الجداول المعتمدة.</span></div>
+      <div class="pol-hl"><b>لا لتجاوز الحماية</b><span>يُمنع استخدام خدمات VPN أو Proxy أو أي أدوات لتجاوز ضوابط الحماية.</span></div>
+      <div class="pol-hl"><b>مراقبة الأداء</b><span>متابعة أداء الشبكة والأحداث الأمنية وفق ضوابط الهيئة الوطنية للأمن السيبراني (NCA) مع حماية الخصوصية.</span></div>
+    </div>
+    <div class="pol-note"><i data-lucide="message-circle"></i><span>لديك ملاحظة أو تواجه حظرًا لخدمة تحتاجها في عملك أو دراستك؟ <a href="#report">أرسل بلاغًا</a> واذكر الخدمة في الوصف، أو قدّم طلب استثناء وفق البند 7 من السياسة.</span></div>
+    <div id="polViewerWrap">
+      <div class="pol-viewer pol-full"><iframe id="polFrame" title="سياسة الاستخدام العادل" loading="lazy"></iframe></div>
+      <p class="hint pol-mobile">على الجوال: اضغط «فتح السياسة» لعرض المستند كاملًا.</p>
+    </div>
+    <div class="alert c-warn" id="polMissing" style="margin-top:14px"><span id="polMissingText"></span></div>
   </div>
 </template>
 
@@ -393,12 +369,12 @@ setTimeout(function(){
 </script>
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v3.0
+ * SRU NetPulse — Frontend v3.1
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '3.0',
+  VERSION: '3.1',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '',
   DOMAINS: ['sr.edu.sa', 'srcolleges.org'],

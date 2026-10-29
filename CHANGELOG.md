@@ -1,5 +1,10 @@
 # Changelog — SRU NetPulse
 
+## v3.1 — 2026-10-29
+### Changed
+- Policy page (approved layout): removed the «بيانات الوثيقة» and «محتويات السياسة» side cards; the PDF viewer now spans the full page width and nearly the full screen height.
+- «لديك ملاحظة…» is now a full-width strip just above the viewer; policy code and version shown under the title (ICTD-025P · v1.1).
+
 ## v3.0 — 2026-10-29
 ### Changed
 - «سياسة الاستخدام العادل» menu item now **glows**: cyan border, tinted background and a pulsing cyan glow (2.2 s cycle); static glow for users who prefer reduced motion.

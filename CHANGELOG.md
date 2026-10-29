@@ -1,5 +1,13 @@
 # Changelog — SRU NetPulse
 
+## v3.0 — 2026-10-29
+### Changed
+- «سياسة الاستخدام العادل» menu item now **glows**: cyan border, tinted background and a pulsing cyan glow (2.2 s cycle); static glow for users who prefer reduced motion.
+- «قبل الإرسال» card: text enlarged to 16 px (title 19 px), dark text instead of grey hint, an icon for each tip, and dividers between tips.
+### Added
+- Tip highlighted in red: «استخدام شبكة VPN محظور على شبكة الجامعة.»
+- Tip: «تحقق من سياسة الاستخدام العادل…» with a link to the policy page.
+
 ## v2.9 — 2026-10-28
 ### Fixed
 - **Frozen sign-in screen — definitive fix, verified against the live deployment.** Decoding the page Apps Script actually delivers showed that its `//`-comment stripper cut line 564 (`'https://drive.google.com/…'`) even inside an ordinary quoted string, while other URLs survived, so its quote tracking is unreliable. v2.8 removed one trigger but not the mechanism.

@@ -1,5 +1,11 @@
 # Changelog — SRU NetPulse
 
+## v3.2 — 2026-10-29
+### Added
+- **University and ICTD logos in every e-mail:** new white brand bar at the top (Sulaiman Al Rajhi University right, ICTD left, as on official letterhead), above the «نبض الشبكة» band; ITOC logo stays in the footer. Logos embedded as inline images (`Brand.gs`: `sru`, `ictd`), about 65 KB per message; they scale down on phones.
+### Fixed
+- «تم الحل» e-mail was wider than phone screens (Yes/No buttons, since v1.8); buttons resized — all e-mails now fit a 390 px screen.
+
 ## v3.1 — 2026-10-29
 ### Changed
 - Policy page (approved layout): removed the «بيانات الوثيقة» and «محتويات السياسة» side cards; the PDF viewer now spans the full page width and nearly the full screen height.

@@ -1,5 +1,26 @@
 # Changelog — SRU NetPulse
 
+## v3.4 — 2026-11-01
+### Added
+- **«Sign in with Google» for @sr.edu.sa and @srcolleges.org** on the GitHub page (https://ictsru.github.io/NetPulse/). OAuth Client ID `839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com` (Google Cloud project «NetPulse», External, origin `https://ictsru.github.io`). The server verifies every Google ID token (audience, verified e-mail, Workspace domain).
+- Client ID and GitHub URL set as defaults in `Code.gs` (`DEFAULT_CLIENT_ID`, `DEFAULT_APP_URL`); Script properties `CLIENT_ID` / `APP_URL` still override them.
+- `privacy.html` — bilingual privacy policy (required by Google for the consent screen), linked from the sign-in footer.
+- Apps Script page: when Google does not identify the user, the card offers «الدخول بحساب Google الجامعي» (→ GitHub page) above the e-mail code option.
+### Changed
+- E-mail links (ticket, feedback buttons, weekly report) now open the GitHub page.
+- Web app must be deployed with **Who has access: Anyone** so the GitHub page can reach it; access is enforced by the Google sign-in check.
+
+## v3.3 — 2026-11-01
+### Fixed
+- **@srcolleges.org accounts could not sign in** («يرجى تسجيل الدخول»). srcolleges.org is a separate Google Workspace; with *Execute as: Me*, Apps Script returns a blank e-mail for users outside the owner's Workspace, so the platform could not identify them.
+### Added
+- **Sign-in by e-mail verification code** — shown automatically when Google does not identify the user: enter the university e-mail (allowed domains only) → 6-digit code by e-mail (branded, valid 10 min) → signed in for 14 days on that browser.
+  - Security: codes and session tokens stored only as SHA-256 hashes; max 5 wrong attempts per code; max 5 codes per e-mail per hour; one-time codes; «تسجيل الخروج» deletes the session.
+  - New `Sessions` tab (TokenHash, Email, Created, Expires), created automatically.
+- @sr.edu.sa users still sign in automatically through Google (no change).
+### Changed
+- Manifest web-app access `ANYONE` (Google account required); the deployment must allow users outside SRU's Workspace: **Who has access: Anyone with a Google account**.
+
 ## v3.2 — 2026-10-29
 ### Added
 - **University and ICTD logos in every e-mail:** new white brand bar at the top (Sulaiman Al Rajhi University right, ICTD left, as on official letterhead), above the «نبض الشبكة» band; ITOC logo stays in the footer. Logos embedded as inline images (`Brand.gs`: `sru`, `ictd`), about 65 KB per message; they scale down on phones.

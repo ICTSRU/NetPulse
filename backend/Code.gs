@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 2.0  (2026-10-13)
+ *  Version: 3.4  (2026-11-01)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -24,13 +24,18 @@
  *    TARGET_SAT / TARGET_RESPONSE_MIN / TARGET_RESOLVE_HOURS / TARGET_REOPEN_PCT  (optional) KPI targets
  *                    defaults: 85 (%) / 60 (min) / 24 (h) / 10 (%)
  *    SEND_EMAILS     (optional) "false" to disable all e-mails (default true)
+ *    POLICY_URL      (optional) Google Drive link to the fair-use policy PDF (ICTD-025P) shown in «سياسة الاستخدام العادل»
  *    APP_URL         (optional) link used in e-mails; default = this Web App's /exec URL
  *
  *  First run: select function `setup` → Run (creates all tabs + seed data).
  * ============================================================
  */
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '2.0' };
+// Google Sign-In (GitHub page). Script properties CLIENT_ID / APP_URL override these defaults.
+const DEFAULT_CLIENT_ID = '839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com';
+const DEFAULT_APP_URL = 'https://ictsru.github.io/NetPulse/';
+
+const APP = { NAME: 'SRU NetPulse', VERSION: '3.4' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -41,6 +46,7 @@ const SHEETS = {
   TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount', 'AssigneeEmail'] },
   LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] },
   FEEDBACK: { name: 'Feedback',      headers: ['Timestamp', 'TicketId', 'Email', 'Answer', 'Note', 'Building', 'IssueType', 'Cycle'] },
+  SESS:     { name: 'Sessions',      headers: ['TokenHash', 'Email', 'Created', 'Expires'] },
   TEAM:     { name: 'Team',          headers: ['Name', 'Title', 'Unit', 'Email', 'Active', 'SortOrder'] },
   WEEKLY:   { name: 'WeeklyKPIs',    headers: ['WeekStart', 'WeekEnd', 'NewTickets', 'Resolved', 'OpenAtEnd', 'SatisfactionPct', 'ResponseRatePct', 'Answers', 'AvgFirstResponseMin', 'AvgResolveHours', 'Reopened', 'ReopenPct', 'AutoClosed', 'TopBuilding', 'TopIssue', 'SpeedTests', 'MedianDownMbps', 'SentTo', 'SentAt'] }
 };
@@ -58,31 +64,130 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.health) {
     return json_({ ok: true, app: APP.NAME, version: APP.VERSION, time: new Date().toISOString() });
   }
-  return HtmlService.createHtmlOutputFromFile('Index')
+  const page = HtmlService.createHtmlOutputFromFile('Index');
+  // Integrity check. HtmlService strips HTML comments, so the markers live inside <script> code:
+  //   'initSignin();' — the last statement of the main script (missing → the file was cut)
+  //   window.NP_END = 'x.y' — the very last script line (used for the version check)
+  const html = page.getContent();
+  if (html.indexOf('initSignin();') === -1) return setupProblem_('ملف الصفحة <b>Index</b> غير مكتمل — يبدو أن جزءًا منه لم يُنسخ.',
+    'افتح ملف Index.html المرفق، انسخ محتواه <b>كاملًا</b> (Ctrl+A ثم Ctrl+C)، والصقه بدل كل محتوى ملف Index في Apps Script، ثم احفظ وانشر إصدارًا جديدًا.');
+  const m = html.match(/NP_END\s*=\s*'([\d.]+)'/);
+  if (m && m[1] !== APP.VERSION) return setupProblem_('إصدار ملف <b>Index</b> (' + m[1] + ') لا يطابق إصدار <b>Code.gs</b> (' + APP.VERSION + ').',
+    'استبدل الملفين معًا من الحزمة نفسها، ثم انشر إصدارًا جديدًا.');
+  return page
     .setTitle('نبض الشبكة — SRU NetPulse')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function setupProblem_(what, fix) {
+  return HtmlService.createHtmlOutput(
+    '<div dir="rtl" style="font-family:Tahoma,Arial;max-width:560px;margin:60px auto;padding:24px;border:1px solid #e4dcef;border-radius:10px;color:#241436">' +
+    '<h2 style="color:#c62828;margin-top:0">نبض الشبكة — المنصة غير جاهزة</h2><p>' + what + '</p>' +
+    '<p style="background:#f0ebf8;padding:12px;border-radius:6px"><b>الحل:</b> ' + fix + '</p>' +
+    '<p style="color:#6b5a80;font-size:12px">رسالة للمسؤول عن تثبيت المنصة · Code.gs v' + APP.VERSION + '</p></div>')
+    .setTitle('نبض الشبكة — إعداد غير مكتمل');
+}
+
 /** Mode A entry point — called from the page with google.script.run.apiCall(action, payload). */
 function apiCall(action, payload) {
   try {
+    payload = payload || {};
     if (action === 'pushStatus') return { ok: false, error: 'UNKNOWN_ACTION' };
-    return route_(String(action || ''), sessionUser_(), payload || {});
+    if (action === 'otpSend') return otpSend_(payload.email);
+    if (action === 'otpVerify') return otpVerify_(payload.email, payload.code);
+    if (action === 'otpLogout') { otpLogout_(payload.otpToken); return { ok: true }; }
+    return route_(String(action || ''), sessionUser_(payload.otpToken), payload);
   } catch (err) {
     return { ok: false, error: String(err.message || err) };
   }
 }
 
 /** Mode A identity: the Google account signed in to the Apps Script page. */
-function sessionUser_() {
-  const email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+function sessionUser_(otpToken) {
+  // 1) Google session (same Workspace as the script owner, e.g. @sr.edu.sa)
+  let email = String(Session.getActiveUser().getEmail() || '').toLowerCase();
+  let via = 'google';
+  // 2) E-mail verification code session (other allowed domains, e.g. @srcolleges.org — Google hides their e-mail)
+  if (!email && otpToken) { email = otpSessionEmail_(otpToken); via = 'otp'; }
   if (!email) throw new Error('AUTH_REQUIRED');
   const domain = email.split('@')[1] || '';
   if (allowedDomains_().indexOf(domain) === -1) throw new Error('AUTH_DOMAIN');
   const row = userRow_(email);
   const name = row && row.Name ? String(row.Name) : '';
-  return { email: email, name: name || email.split('@')[0], nameMissing: !name, picture: '', role: roleOf_(email) };
+  return { email: email, name: name || email.split('@')[0], nameMissing: !name, picture: '', role: roleOf_(email), via: via };
+}
+
+/* ---------------- E-mail verification code sign-in (v3.3) ---------------- */
+const OTP_TTL_SEC = 600;          // code valid 10 minutes
+const OTP_MAX_TRIES = 5;          // wrong attempts per code
+const OTP_MAX_SENDS = 5;          // codes per e-mail per hour
+const SESSION_DAYS = 14;          // signed-in period after a successful code
+
+function sha_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s))
+    .map(b => ('0' + (b & 255).toString(16)).slice(-2)).join('');
+}
+
+function otpSend_(rawEmail) {
+  const email = String(rawEmail || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+$/.test(email)) throw new Error('BAD_EMAIL');
+  if (allowedDomains_().indexOf(email.split('@')[1]) === -1) throw new Error('AUTH_DOMAIN');
+  const cache = CacheService.getScriptCache();
+  const sentKey = 'otp_n_' + sha_(email);
+  const sent = Number(cache.get(sentKey) || 0);
+  if (sent >= OTP_MAX_SENDS) throw new Error('OTP_TOO_MANY');
+  cache.put(sentKey, String(sent + 1), 3600);
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  cache.put('otp_' + sha_(email), JSON.stringify({ h: sha_(email + ':' + code), t: 0 }), OTP_TTL_SEC);
+  sendMail_(email, 'رمز الدخول إلى نبض الشبكة: ' + code,
+    mailShell_({
+      preheader: 'رمز الدخول: ' + code + ' — صالح لمدة 10 دقائق',
+      title: 'رمز الدخول إلى المنصة',
+      intro: 'استخدم الرمز التالي لتسجيل الدخول إلى منصة نبض الشبكة. الرمز صالح لمدة <b>10 دقائق</b>.',
+      extra: '<p style="margin:22px 0;text-align:center"><span dir="ltr" style="display:inline-block;font-family:Tahoma,Arial,sans-serif;font-size:34px;font-weight:bold;letter-spacing:10px;color:#3a1464;background:#f0ebf8;border:1px dashed #501e8c;border-radius:8px;padding:12px 22px">' + code + '</span></p>',
+      note: 'إن لم تطلب هذا الرمز فتجاهل هذه الرسالة؛ لن يتمكن أحد من الدخول دون الرمز.'
+    }), 'رمز الدخول: ' + code);
+  return { ok: true, ttl: OTP_TTL_SEC };
+}
+
+function otpVerify_(rawEmail, rawCode) {
+  const email = String(rawEmail || '').trim().toLowerCase();
+  const code = String(rawCode || '').replace(/[^0-9٠-٩]/g, '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const cache = CacheService.getScriptCache();
+  const key = 'otp_' + sha_(email);
+  const rec = JSON.parse(cache.get(key) || 'null');
+  if (!rec) throw new Error('OTP_EXPIRED');
+  if (rec.t >= OTP_MAX_TRIES) { cache.remove(key); throw new Error('OTP_EXPIRED'); }
+  if (sha_(email + ':' + code) !== rec.h) {
+    rec.t++; cache.put(key, JSON.stringify(rec), OTP_TTL_SEC);
+    throw new Error('OTP_WRONG');
+  }
+  cache.remove(key);
+  const token = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '');
+  const now = new Date(), exp = new Date(now.getTime() + SESSION_DAYS * 86400000);
+  appendRow_(SHEETS.SESS, { TokenHash: sha_(token), Email: email, Created: now, Expires: exp });
+  cache.put('sess_' + sha_(token), email, 21600);
+  return { ok: true, token: token, days: SESSION_DAYS };
+}
+
+function otpSessionEmail_(token) {
+  const th = sha_(token);
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('sess_' + th);
+  if (hit) return hit;
+  const r = readAll_(SHEETS.SESS).find(x => x.TokenHash === th && x.Expires && new Date(x.Expires) > new Date());
+  if (!r) return '';
+  cache.put('sess_' + th, String(r.Email), 21600);
+  return String(r.Email);
+}
+
+function otpLogout_(token) {
+  if (!token) return;
+  const th = sha_(token);
+  CacheService.getScriptCache().remove('sess_' + th);
+  const sh = sheet_(SHEETS.SESS); const v = sh.getDataRange().getValues();
+  for (let i = v.length - 1; i >= 1; i--) if (v[i][0] === th) sh.deleteRow(i + 1);
 }
 
 function doPost(e) {
@@ -133,7 +238,7 @@ function authenticate_(idToken) {
   if (res.getResponseCode() !== 200) throw new Error('AUTH_INVALID');
   const info = JSON.parse(res.getContentText());
 
-  const clientId = prop_('CLIENT_ID');
+  const clientId = prop_('CLIENT_ID') || DEFAULT_CLIENT_ID;
   const domains = allowedDomains_();
   const email = String(info.email || '').toLowerCase();
   const domain = email.split('@')[1] || '';
@@ -233,7 +338,8 @@ function login_(user, body) {
       .map(r => ({ building: String(r.Building), college: String(r.College || '') })),
     buildings: buildingStatus_(),
     tickets: myTickets_(user),
-    team: (user.role === 'tech' || user.role === 'admin') ? team_() : []
+    team: (user.role === 'tech' || user.role === 'admin') ? team_() : [],
+    policyUrl: prop_('POLICY_URL') || ''
   };
 }
 
@@ -251,7 +357,7 @@ function saveSpeedTest_(user, d) {
 
 function createTicket_(user, d) {
   const desc = clean_(d.description, 500);
-  if (!d.building || !d.issueType || desc.length < 5) throw new Error('MISSING_FIELDS');
+  if (!d.building || !d.issueType || !d.department) throw new Error('MISSING_FIELDS');   // description is optional
   const mobile = normalizeMobile_(d.mobile);
   const row0 = userRow_(user.email);
   if (!row0 || !row0.Mobile) upsertUserMobile_(user, mobile);
@@ -435,7 +541,7 @@ function setBuildingStatus_(user, d) {
 
 /**
  * Monitoring push — POST JSON:
- * { "action":"pushStatus", "key":"<MONITOR_KEY>", "items":[{"building":"مبنى كلية الطب","status":"slow","note":"Uplink 92%"}] }
+ * { "action":"pushStatus", "key":"<MONITOR_KEY>", "items":[{"building":"مبنى 1","status":"slow","note":"Uplink 92%"}] }
  */
 function pushStatus_(body) {
   const key = prop_('MONITOR_KEY');
@@ -502,7 +608,7 @@ const STATUS_STYLE = {
 };
 
 function appUrl_() {
-  return prop_('APP_URL') || ScriptApp.getService().getUrl() || '';
+  return prop_('APP_URL') || DEFAULT_APP_URL || ScriptApp.getService().getUrl() || '';
 }
 function ticketUrl_(id) {
   const u = appUrl_();
@@ -534,7 +640,7 @@ function notifyNewTicket_(id, user, d, desc) {
     ['الموقع', esc_(d.building) + (d.spot ? ' — ' + esc_(d.spot) : '')],
     ['نوع المشكلة', esc_(d.issueType)],
     ['وقت البلاغ', fmtDate_(new Date())],
-    ['الوصف', esc_(desc)]
+    ['الوصف', esc_(desc || '—')]
   ];
   sendMail_(user.email, 'تم استلام بلاغك ' + id + ' — نبض الشبكة',
     mailShell_({
@@ -563,7 +669,7 @@ function notifyNewTicket_(id, user, d, desc) {
           ['الموقع', esc_(d.building) + (d.spot ? ' — ' + esc_(d.spot) : '')],
           ['نوع المشكلة', esc_(d.issueType) + ' <span style="color:#6b5a80">(' + esc_(d.connection || '') + ')</span>'],
           ['آخر قياس', '<span dir="ltr">' + esc_(t) + '</span>'],
-          ['الوصف', esc_(desc)]
+          ['الوصف', esc_(desc || '—')]
         ],
         button: { text: 'فتح البلاغ في المنصة', url: ticketUrl_(id) }
       }), 'بلاغ جديد ' + id);
@@ -592,8 +698,8 @@ function notifyReporter_(email, id, status, note) {
 function notifyResolved_(email, id, note) {
   const days = Number(prop_('AUTOCLOSE_DAYS')) || 3;
   const yes = ticketUrl_(id) + '&fb=yes', no = ticketUrl_(id) + '&fb=no';
-  const btn = (url, text, bg) => '<td align="center" style="padding:0 6px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="' + bg + '" style="border-radius:6px">' +
-    '<a href="' + url + '" target="_blank" style="display:inline-block;min-width:170px;padding:13px 18px;font-family:Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px">' + text + '</a></td></tr></table></td>';
+  const btn = (url, text, bg) => '<td align="center" style="padding:0 4px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="' + bg + '" style="border-radius:6px">' +
+    '<a href="' + url + '" target="_blank" style="display:inline-block;min-width:100px;padding:12px 10px;font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:6px">' + text + '</a></td></tr></table></td>';
   sendMail_(email, 'تم حل بلاغك ' + id + ' — هل حُلّت مشكلتك؟',
     mailShell_({
       preheader: 'أنهى الفريق الفني معالجة بلاغك ' + id + '. أخبرنا: هل حُلّت مشكلتك؟',
@@ -646,7 +752,7 @@ function notifyAssignee_(email, name, by, row, c) {
         ['الموقع', esc_(row[c('Building')]) + (row[c('Spot')] ? ' — ' + esc_(row[c('Spot')]) : '')],
         ['نوع المشكلة', esc_(row[c('IssueType')])],
         ['المُبلِّغ', esc_(row[c('Name')]) + ' — <a href="tel:' + esc_(String(row[c('Mobile')]).replace(/^'/, '')) + '" dir="ltr" style="color:#0a6eaa;text-decoration:none">' + esc_(String(row[c('Mobile')]).replace(/^'/, '')) + '</a>'],
-        ['الوصف', esc_(row[c('Description')])]
+        ['الوصف', esc_(row[c('Description')] || '—')]
       ],
       button: { text: 'فتح البلاغ ومعالجته', url: ticketUrl_(id) }
     }), 'أُسند إليك البلاغ ' + id);
@@ -811,6 +917,12 @@ function mailShell_(o) {
     '<div style="display:none;max-height:0;overflow:hidden;opacity:0">' + esc_(o.preheader || '') + '</div>' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f3eff9"><tr><td align="center" style="padding:24px 12px">' +
     '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e4dcef" dir="rtl">' +
+    // brand bar: university (right) · ICTD (left)
+    '<tr><td style="background:#ffffff;padding:14px 18px;border-bottom:1px solid #eee8f5">' +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>' +
+      '<td align="right" valign="middle" width="64%"><img src="cid:srulogo" width="240" alt="جامعة سليمان الراجحي" style="display:block;border:0;width:100%;max-width:240px;height:auto"></td>' +
+      '<td align="left" valign="middle" width="36%"><img src="cid:ictdlogo" width="110" alt="الإدارة التنفيذية للاتصالات وتقنية المعلومات" style="display:block;border:0;width:100%;max-width:110px;height:auto;margin-right:auto"></td>' +
+      '</tr></table></td></tr>' +
     // header
     '<tr><td bgcolor="#3a1464" style="background:#3a1464;padding:22px 26px" align="right">' +
       '<img src="cid:nplogo" width="210" alt="نبض الشبكة — SRU NetPulse" style="display:block;border:0;width:210px;height:auto"></td></tr>' +
@@ -863,14 +975,13 @@ function setup() {
   if (locs.getLastRow() < 2) {
     // Seed buildings — EDIT this tab to match SRU's real buildings/zones.
     const seed = [
-      ['مبنى كلية الطب', 'كلية الطب', true, 1],
-      ['مبنى كلية التمريض', 'كلية التمريض', true, 2],
-      ['مبنى كلية العلوم التطبيقية', 'كلية العلوم التطبيقية', true, 3],
-      ['مبنى كلية الأعمال', 'كلية الأعمال', true, 4],
-      ['المبنى الإداري', '', true, 5],
-      ['المكتبة', '', true, 6],
-      ['شطر الطالبات', 'شطر الطالبات', true, 7],
-      ['السكن الجامعي', '', true, 8]
+      ['مبنى 1', '', true, 1],
+      ['مبنى 2', '', true, 2],
+      ['مبنى 3', '', true, 3],
+      ['مبنى 4', '', true, 4],
+      ['شطر الطالبات', 'شطر الطالبات', true, 5],
+      ['سكن الطلاب', '', true, 6],
+      ['سكن الطالبات', '', true, 7]
     ];
     locs.getRange(2, 1, seed.length, 4).setValues(seed);
   }

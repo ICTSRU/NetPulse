@@ -373,12 +373,12 @@ setTimeout(function(){
 </script>
 <script>
 /* =============================================================
- * SRU NetPulse — Frontend v3.4
+ * SRU NetPulse — Frontend v3.5
  * Set API_URL (Apps Script Web App /exec URL) and CLIENT_ID
  * (Google OAuth Web Client ID). Leave both empty for demo mode.
  * ============================================================= */
 const CONFIG = {
-  VERSION: '3.4',
+  VERSION: '3.5',
   API_URL: 'https://script.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com',
   GITHUB_URL: 'https://ictsru.github.io/NetPulse/',
@@ -806,7 +806,12 @@ function topAvg(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>y-x); con
 function reportFromTest(){ S.prefill = { building: $('#sb').value, issueType: S.lastTest && S.lastTest.download<10 ? 'بطء الإنترنت':'', connection: $('#sc').value }; go('report'); }
 
 /* ----- Report view ----- */
-function deptOptions(){ return `<option value="">— اختر الجهة —</option>` + DEPARTMENTS.map(g=>`<optgroup label="${esc(g.label)}">${g.items.map(i=>`<option>${esc(i)}</option>`).join('')}</optgroup>`).join(''); }
+/* @srcolleges.org accounts: colleges only (names verbatim from sru-departments.json) */
+const COLLEGES_ONLY = ['كلية الطب','كلية التمريض','كلية العلوم التطبيقية','كلية الأعمال'];
+function collegesOnly(){ return /@srcolleges\.org$/i.test((S.user && S.user.email) || ''); }
+function deptOptions(){
+  if (collegesOnly()) return `<option value="">— اختر الكلية —</option>` + COLLEGES_ONLY.map(c=>`<option>${esc(c)}</option>`).join('');
+  return `<option value="">— اختر الجهة —</option>` + DEPARTMENTS.map(g=>`<optgroup label="${esc(g.label)}">${g.items.map(i=>`<option>${esc(i)}</option>`).join('')}</optgroup>`).join(''); }
 function vReport(){
   const p = S.prefill || {}; S.prefill=null;
   let dept=''; try{ dept=localStorage.getItem('np_dept')||''; }catch(e){}
@@ -843,7 +848,7 @@ function vReport(){
         </ul>
       </div>
     </div>`;
-  if (dept) $('#rd').value = dept;
+  if (dept && [...$('#rd').options].some(o=>o.value===dept)) $('#rd').value = dept;
   // clear the red highlight as soon as a required field is filled
   document.querySelectorAll('#rform .field.req select, #rform .field.req input').forEach(el =>
     ['input','change'].forEach(evt => el.addEventListener(evt, () => { if (fieldOk(el)) el.closest('.field').classList.remove('invalid'); })));

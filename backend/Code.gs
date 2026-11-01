@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 3.4  (2026-11-01)
+ *  Version: 3.5  (2026-11-01)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -35,7 +35,7 @@
 const DEFAULT_CLIENT_ID = '839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com';
 const DEFAULT_APP_URL = 'https://ictsru.github.io/NetPulse/';
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '3.4' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '3.5' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
@@ -358,6 +358,9 @@ function saveSpeedTest_(user, d) {
 function createTicket_(user, d) {
   const desc = clean_(d.description, 500);
   if (!d.building || !d.issueType || !d.department) throw new Error('MISSING_FIELDS');   // description is optional
+  // @srcolleges.org accounts may only choose one of the four colleges
+  const COLLEGES_ONLY = ['كلية الطب', 'كلية التمريض', 'كلية العلوم التطبيقية', 'كلية الأعمال'];
+  if (/@srcolleges\.org$/.test(user.email) && COLLEGES_ONLY.indexOf(String(d.department)) === -1) throw new Error('MISSING_FIELDS');
   const mobile = normalizeMobile_(d.mobile);
   const row0 = userRow_(user.email);
   if (!row0 || !row0.Mobile) upsertUserMobile_(user, mobile);

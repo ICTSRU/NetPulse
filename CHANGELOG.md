@@ -1,5 +1,10 @@
 # Changelog — SRU NetPulse
 
+## v3.5 — 2026-11-01
+### Changed
+- **@srcolleges.org accounts:** «الكلية / الجهة» lists only the four colleges — كلية الطب، كلية التمريض، كلية العلوم التطبيقية، كلية الأعمال (verbatim from sru-departments.json), placeholder «— اختر الكلية —». The server rejects any other value for these accounts. @sr.edu.sa accounts keep the full grouped list.
+- A remembered department is only pre-selected if it exists in the user's list.
+
 ## v3.4 — 2026-11-01
 ### Added
 - **«Sign in with Google» for @sr.edu.sa and @srcolleges.org** on the GitHub page (https://ictsru.github.io/NetPulse/). OAuth Client ID `839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com` (Google Cloud project «NetPulse», External, origin `https://ictsru.github.io`). The server verifies every Google ID token (audience, verified e-mail, Workspace domain).

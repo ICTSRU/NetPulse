@@ -1,5 +1,30 @@
 # Changelog — SRU NetPulse
 
+## v3.7 — 2026-11-02
+### Added — attachments on reports
+- «المرفقات» field on «الإبلاغ عن مشكلة»: up to **3 files**, **5 MB each / 10 MB total** — images (JPG, PNG, WEBP, GIF, HEIC), PDF, text/log, Word (.docx), Excel (.xlsx).
+- Choose a file, drag-and-drop, or paste a screenshot (Ctrl+V); on phones the picker offers the camera. Thumbnails with a remove button before sending.
+- Large photos/screenshots are compressed in the browser (max 1600 px, JPEG) before upload.
+- Files are saved in Google Drive — folder «SRU NetPulse — مرفقات البلاغات», one sub-folder per ticket — viewable with the link by @sr.edu.sa accounts; the reporter is added as viewer when outside sr.edu.sa.
+- Attachments appear in the ticket view (reporter and team), the confirmation e-mail and the team e-mail; the ticket log notes the number of files.
+- New `Attachments` column in `Tickets` (added automatically). Server re-checks count, type and size.
+### Setup
+- New Drive permission (`auth/drive`). After pasting the code: replace **appsscript.json** too, run **`setupAttachments`** once from the editor and approve, then deploy a new version.
+
+## v3.6 — 2026-11-02
+### Added — detailed speed test (Cloudflare-style)
+- **Latency (idle)** from 20 probes (server processing time subtracted when Cloudflare reports it), plus **loaded latency** during download and during upload.
+- **Jitter** (mean difference between consecutive probes) shown in its own tile.
+- **Packet loss (estimate)** — 40 quick requests with a 2-second timeout; % that did not arrive. Browsers cannot send raw ICMP/UDP, so this is an HTTP-level estimate and is labelled as such.
+- **Server location & ISP** (Cloudflare data centre, city, ISP name, public IP) from `speed.cloudflare.com/meta`.
+- **Network quality score** — Video streaming / Online gaming / Video calls: جيد · مقبول · ضعيف.
+- Live sparklines inside the download and upload cards; gauge shows ms / % during the latency and loss phases.
+- Colour-coded tiles (green / amber / red) for latency, jitter and loss.
+### Changed
+- Overall verdict now also considers packet loss.
+- `SpeedTests` sheet: new columns PacketLossPct, LoadedLatencyDownMs, LoadedLatencyUpMs, ServerColo, ISP (added automatically). The public IP is shown to the user only and is not stored.
+- Results attached to a report now include jitter and packet loss (shown in the ticket and the team e-mail).
+
 ## v3.5 — 2026-11-01
 ### Changed
 - **@srcolleges.org accounts:** «الكلية / الجهة» lists only the four colleges — كلية الطب، كلية التمريض، كلية العلوم التطبيقية، كلية الأعمال (verbatim from sru-departments.json), placeholder «— اختر الكلية —». The server rejects any other value for these accounts. @sr.edu.sa accounts keep the full grouped list.

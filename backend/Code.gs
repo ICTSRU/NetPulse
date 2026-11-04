@@ -2,7 +2,7 @@
  * ============================================================
  *  نبض الشبكة — SRU NetPulse (منصة جودة الإنترنت)
  *  Backend: Google Apps Script + Google Sheets
- *  Version: 3.5  (2026-11-01)
+ *  Version: 3.7  (2026-11-02)
  *  Owner:   ICTD — IT Operations Center (ITOC)
  * ============================================================
  *  Script Properties (Project Settings → Script properties):
@@ -35,15 +35,15 @@
 const DEFAULT_CLIENT_ID = '839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com';
 const DEFAULT_APP_URL = 'https://ictsru.github.io/NetPulse/';
 
-const APP = { NAME: 'SRU NetPulse', VERSION: '3.5' };
+const APP = { NAME: 'SRU NetPulse', VERSION: '3.7' };
 
 const SHEETS = {
   SIGNIN:   { name: 'SignInLog',     headers: ['Timestamp', 'Email', 'Name', 'Date', 'Time', 'Role', 'Client', 'Mobile'] },
   USERS:    { name: 'Users',         headers: ['Email', 'Name', 'Role', 'Active', 'Notes', 'Mobile'] },
   LOCS:     { name: 'Locations',     headers: ['Building', 'College', 'Active', 'SortOrder'] },
   NETSTAT:  { name: 'NetworkStatus', headers: ['Building', 'Status', 'Source', 'Note', 'UpdatedAt', 'UpdatedBy'] },
-  TESTS:    { name: 'SpeedTests',    headers: ['Timestamp', 'Email', 'Building', 'DownloadMbps', 'UploadMbps', 'PingMs', 'JitterMs', 'Connection', 'Server', 'Client'] },
-  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount', 'AssigneeEmail'] },
+  TESTS:    { name: 'SpeedTests',    headers: ['Timestamp', 'Email', 'Building', 'DownloadMbps', 'UploadMbps', 'PingMs', 'JitterMs', 'Connection', 'Server', 'Client', 'PacketLossPct', 'LoadedLatencyDownMs', 'LoadedLatencyUpMs', 'ServerColo', 'ISP'] },
+  TICKETS:  { name: 'Tickets',       headers: ['TicketId', 'CreatedAt', 'Email', 'Name', 'Department', 'Building', 'Spot', 'IssueType', 'Connection', 'OccurredAt', 'Description', 'Status', 'Priority', 'Assignee', 'FirstResponseAt', 'ResolvedAt', 'UpdatedAt', 'Resolution', 'DownloadMbps', 'UploadMbps', 'PingMs', 'Mobile', 'Feedback', 'FeedbackAt', 'ReopenCount', 'AssigneeEmail', 'Attachments'] },
   LOG:      { name: 'TicketLog',     headers: ['Timestamp', 'TicketId', 'Action', 'Status', 'Note', 'By'] },
   FEEDBACK: { name: 'Feedback',      headers: ['Timestamp', 'TicketId', 'Email', 'Answer', 'Note', 'Building', 'IssueType', 'Cycle'] },
   SESS:     { name: 'Sessions',      headers: ['TokenHash', 'Email', 'Created', 'Expires'] },
@@ -348,7 +348,9 @@ function saveSpeedTest_(user, d) {
     Timestamp: new Date(), Email: user.email, Building: clean_(d.building, 120),
     DownloadMbps: num_(d.download), UploadMbps: num_(d.upload),
     PingMs: num_(d.ping), JitterMs: num_(d.jitter),
-    Connection: clean_(d.connection, 40), Server: clean_(d.server, 80), Client: clean_(d.client, 200)
+    Connection: clean_(d.connection, 40), Server: clean_(d.server, 80), Client: clean_(d.client, 200),
+    PacketLossPct: d.loss == null ? '' : num_(d.loss), LoadedLatencyDownMs: d.loadedDown == null ? '' : num_(d.loadedDown), LoadedLatencyUpMs: d.loadedUp == null ? '' : num_(d.loadedUp),
+    ServerColo: clean_(d.colo, 10), ISP: clean_(d.isp, 80)
   };
   if (!(row.DownloadMbps >= 0) || row.DownloadMbps > 20000) throw new Error('INVALID_TEST');
   appendRow_(SHEETS.TESTS, row);
@@ -366,6 +368,8 @@ function createTicket_(user, d) {
   if (!row0 || !row0.Mobile) upsertUserMobile_(user, mobile);
   d.mobile = mobile;
 
+  const files = checkAttachments_(d.attachments);   // validate before a ticket number is used
+
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   let id;
@@ -374,6 +378,11 @@ function createTicket_(user, d) {
     const next = (Number(props.getProperty('TICKET_SEQ')) || 1000) + 1;
     props.setProperty('TICKET_SEQ', String(next));
     id = 'NP-' + next;
+  } finally { lock.releaseLock(); }
+
+  const attachments = files.length ? saveAttachments_(id, user, files) : [];
+  d.attachmentsSaved = attachments;
+  {
     const now = new Date();
     appendRow_(SHEETS.TICKETS, {
       TicketId: id, CreatedAt: now, Email: user.email, Name: user.name,
@@ -383,13 +392,86 @@ function createTicket_(user, d) {
       Status: 'open', Priority: suggestPriority_(d), Assignee: '', FirstResponseAt: '', ResolvedAt: '',
       UpdatedAt: now, Resolution: '',
       DownloadMbps: d.test ? num_(d.test.download) : '', UploadMbps: d.test ? num_(d.test.upload) : '',
-      PingMs: d.test ? num_(d.test.ping) : '', Mobile: "'" + mobile
+      PingMs: d.test ? num_(d.test.ping) : '', Mobile: "'" + mobile,
+      Attachments: attachments.length ? JSON.stringify(attachments) : ''
     });
-    appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: id, Action: 'created', Status: 'open', Note: '', By: user.email });
-  } finally { lock.releaseLock(); }
+    appendRow_(SHEETS.LOG, { Timestamp: now, TicketId: id, Action: 'created', Status: 'open',
+      Note: attachments.length ? 'مرفقات: ' + attachments.length : '', By: user.email });
+  }
 
   notifyNewTicket_(id, user, d, desc);
   return { ok: true, ticketId: id };
+}
+
+/* ---------------- Attachments (v3.7) ----------------
+ * Up to 3 files per report, 5 MB each, 10 MB in total. Images, PDF, text/log, Word, Excel.
+ * Stored in a Drive folder owned by the script owner («SRU NetPulse — مرفقات البلاغات»),
+ * one sub-folder per ticket; viewable by @sr.edu.sa accounts with the link (team) and shared
+ * with the reporter when he is outside sr.edu.sa (e.g. @srcolleges.org).
+ */
+const ATTACH = {
+  MAX_FILES: 3, MAX_BYTES: 5 * 1024 * 1024, MAX_TOTAL: 10 * 1024 * 1024,
+  TYPES: {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic', 'image/heif': 'heif',
+    'application/pdf': 'pdf', 'text/plain': 'txt',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx'
+  }
+};
+
+function checkAttachments_(list) {
+  if (!list || !list.length) return [];
+  if (!Array.isArray(list) || list.length > ATTACH.MAX_FILES) throw new Error('ATTACH_COUNT');
+  let total = 0;
+  return list.map(f => {
+    const type = String(f && f.type || '').toLowerCase();
+    if (!ATTACH.TYPES[type]) throw new Error('ATTACH_TYPE');
+    const bytes = Utilities.base64Decode(String(f.data || '').replace(/^data:[^,]*,/, ''));
+    if (!bytes.length || bytes.length > ATTACH.MAX_BYTES) throw new Error('ATTACH_SIZE');
+    total += bytes.length;
+    if (total > ATTACH.MAX_TOTAL) throw new Error('ATTACH_SIZE');
+    let name = String(f.name || 'file').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 80);
+    if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += '.' + ATTACH.TYPES[type];
+    return { name: name, type: type, bytes: bytes };
+  });
+}
+
+function attachRoot_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('ATTACH_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const f = DriveApp.createFolder('SRU NetPulse — مرفقات البلاغات');
+  props.setProperty('ATTACH_FOLDER_ID', f.getId());
+  return f;
+}
+
+function saveAttachments_(ticketId, user, files) {
+  const folder = attachRoot_().createFolder(ticketId);
+  try { folder.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  const outside = !/@sr\.edu\.sa$/i.test(user.email);
+  return files.map((f, i) => {
+    const file = folder.createFile(Utilities.newBlob(f.bytes, f.type, (i + 1) + '-' + f.name));
+    try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    if (outside) { try { file.addViewer(user.email); } catch (e) {} }
+    return { id: file.getId(), name: f.name, type: f.type, size: f.bytes.length, url: file.getUrl() };
+  });
+}
+
+function parseAttachments_(v) {
+  if (!v) return [];
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+
+function attachHtml_(list) {
+  if (!list || !list.length) return '—';
+  return list.map(a => '<a href="' + esc_(a.url) + '" style="color:#0a6eaa;text-decoration:none">📎 ' + esc_(a.name) + '</a>' +
+    ' <span style="color:#6b5a80;font-size:12px" dir="ltr">(' + Math.max(1, Math.round(a.size / 1024)) + ' KB)</span>').join('<br>');
+}
+
+/** Run once from the editor after updating: grants Drive access and creates the attachments folder. */
+function setupAttachments() {
+  const f = attachRoot_();
+  Logger.log('Attachments folder: ' + f.getUrl());
 }
 
 /** Auto-triage: full outage or very slow measured speed → higher priority. */
@@ -645,6 +727,7 @@ function notifyNewTicket_(id, user, d, desc) {
     ['وقت البلاغ', fmtDate_(new Date())],
     ['الوصف', esc_(desc || '—')]
   ];
+  if (d.attachmentsSaved && d.attachmentsSaved.length) rows.push(['المرفقات', attachHtml_(d.attachmentsSaved)]);
   sendMail_(user.email, 'تم استلام بلاغك ' + id + ' — نبض الشبكة',
     mailShell_({
       preheader: 'تم استلام بلاغك ' + id + ' وتحويله إلى الفريق الفني.',
@@ -657,7 +740,7 @@ function notifyNewTicket_(id, user, d, desc) {
 
   const noc = prop_('NOTIFY_EMAIL');
   if (noc) {
-    const t = d.test ? num_(d.test.download) + ' ↓ / ' + num_(d.test.upload) + ' ↑ Mbps · ' + num_(d.test.ping) + ' ms' : 'لم يُرفق قياس';
+    const t = d.test ? num_(d.test.download) + ' ↓ / ' + num_(d.test.upload) + ' ↑ Mbps · ' + num_(d.test.ping) + ' ms' + (d.test.jitter != null && d.test.jitter !== '' ? ' · Jitter ' + num_(d.test.jitter) + ' ms' : '') + (d.test.loss != null && d.test.loss !== '' ? ' · Loss ' + num_(d.test.loss) + '%' : '') : 'لم يُرفق قياس';
     sendMail_(noc, '[NetPulse] بلاغ جديد ' + id + ' — ' + d.building + ' — ' + d.issueType,
       mailShell_({
         preheader: 'بلاغ جديد ' + id + ' في ' + d.building,
@@ -672,7 +755,8 @@ function notifyNewTicket_(id, user, d, desc) {
           ['الموقع', esc_(d.building) + (d.spot ? ' — ' + esc_(d.spot) : '')],
           ['نوع المشكلة', esc_(d.issueType) + ' <span style="color:#6b5a80">(' + esc_(d.connection || '') + ')</span>'],
           ['آخر قياس', '<span dir="ltr">' + esc_(t) + '</span>'],
-          ['الوصف', esc_(desc || '—')]
+          ['الوصف', esc_(desc || '—')],
+          ['المرفقات', attachHtml_(d.attachmentsSaved)]
         ],
         button: { text: 'فتح البلاغ في المنصة', url: ticketUrl_(id) }
       }), 'بلاغ جديد ' + id);
@@ -1050,7 +1134,8 @@ function publicTicket_(r) {
     updatedAt: iso_(r.UpdatedAt), resolution: r.Resolution,
     mobile: String(r.Mobile || '').replace(/^'/, ''),
     feedback: r.Feedback || '', feedbackAt: iso_(r.FeedbackAt), reopenCount: Number(r.ReopenCount) || 0,
-    test: r.DownloadMbps !== '' ? { download: Number(r.DownloadMbps), upload: Number(r.UploadMbps), ping: Number(r.PingMs) } : null
+    test: r.DownloadMbps !== '' ? { download: Number(r.DownloadMbps), upload: Number(r.UploadMbps), ping: Number(r.PingMs) } : null,
+    attachments: parseAttachments_(r.Attachments).map(a => ({ name: a.name, type: a.type, size: a.size, url: a.url, id: a.id }))
   };
 }
 

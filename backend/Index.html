@@ -135,6 +135,32 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .m-down{background:var(--blue-light)} .m-down svg{color:var(--blue)}
 .m-up{background:var(--ok-bg)} .m-up svg{color:var(--ok)}
 .m-ping{background:var(--purple-light)} .m-ping svg{color:var(--purple)}
+.m-down,.m-up{position:relative;overflow:hidden}
+.m-down .spark,.m-up .spark{position:absolute;inset-inline-start:30%;inset-inline-end:8px;bottom:6px;height:38px;opacity:.9;pointer-events:none}
+.m-down .spark{color:var(--blue)} .m-up .spark{color:var(--ok)}
+.st-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.st-tile{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:#fff;min-width:0}
+.st-tile .k{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;font-weight:700}
+.st-tile .k svg{width:16px;height:16px;color:var(--purple)}
+.st-tile .v{font-size:24px;font-weight:800;margin:4px 0 2px;color:var(--ink)}
+.st-tile .v small{font-size:13px;color:var(--muted);font-weight:600}
+.st-tile .s{font-size:12px;color:var(--muted);line-height:1.7}
+.st-tile .s b{color:var(--ink)}
+.st-tile.lvl-ok{border-top:3px solid var(--ok)} .st-tile.lvl-warn{border-top:3px solid var(--warn)} .st-tile.lvl-bad{border-top:3px solid var(--bad)}
+.st-sec{margin-top:18px;font-weight:800;font-size:15px;display:flex;align-items:center;gap:6px}
+.st-sec svg{width:18px;height:18px;color:var(--purple)}
+.qscore{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:10px}
+.qs{border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:10px;background:var(--grey-bg)}
+.qs .ic{width:38px;height:38px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:none}
+.qs .ic svg{width:19px;height:19px}
+.qs b{display:block;font-size:14px} .qs span{font-size:12.5px;font-weight:700}
+.qs.q-ok{background:var(--ok-bg)} .qs.q-ok span,.qs.q-ok svg{color:var(--ok)}
+.qs.q-warn{background:var(--warn-bg)} .qs.q-warn span,.qs.q-warn svg{color:var(--warn)}
+.qs.q-bad{background:var(--bad-bg)} .qs.q-bad span,.qs.q-bad svg{color:var(--bad)}
+.qs.q-na span{color:var(--muted)}
+@media (max-width:900px){ .st-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .qscore{grid-template-columns:1fr} }
+@media (max-width:600px){ .m-down .spark,.m-up .spark{inset-inline-start:45%;height:24px;opacity:.55} .st-tile .k .en{display:none} .st-tile{padding:10px 12px} .qscore{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px} .qs{flex-direction:column;text-align:center;padding:10px 6px;gap:6px} .qs b{font-size:12.5px} }
+@media (max-width:420px){ .st-tile .v{font-size:20px} }
 
 /* ---------- building status ---------- */
 .bcard{border:1px solid var(--border);border-radius:8px;padding:14px;background:#fff;border-inline-start:5px solid var(--grey)}
@@ -174,6 +200,20 @@ tr.click{cursor:pointer} tr.click:hover td{background:#faf8fd}
 .field.invalid label.f{color:var(--bad)}
 .field.invalid select,.field.invalid input{border:2px solid var(--bad)!important;background:var(--bad-bg)!important}
 .field.invalid select:focus,.field.invalid input:focus{outline:2px solid rgba(198,40,40,.25)}
+.dropzone{border:2px dashed rgba(80,30,140,.28);border-radius:8px;padding:16px;text-align:center;background:#fbfaff;cursor:pointer;transition:.15s;color:var(--muted);font-size:13.5px}
+.dropzone:hover,.dropzone.over{border-color:var(--purple);background:var(--purple-light)}
+.dropzone svg{width:26px;height:26px;color:var(--purple);display:block;margin:0 auto 4px}
+.dropzone b{color:var(--purple)}
+.att-list{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.att{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;background:#fff;max-width:100%;min-width:0}
+.att .th{width:42px;height:42px;border-radius:6px;background:var(--purple-light);display:grid;place-items:center;flex:none;overflow:hidden}
+.att .th img{width:100%;height:100%;object-fit:cover}
+.att .th svg{width:20px;height:20px;color:var(--purple)}
+.att .nm{font-size:12.5px;font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att .sz{font-size:11.5px;color:var(--muted)}
+.att button{border:0;background:var(--bad-bg);color:var(--bad);width:26px;height:26px;border-radius:50%;cursor:pointer;display:grid;place-items:center;flex:none}
+.att button svg{width:14px;height:14px}
+a.att{text-decoration:none;color:var(--ink)} a.att:hover{border-color:var(--purple)}
 .fmsg{display:none;color:var(--bad);font-size:12px;font-weight:700;margin-top:4px}
 .field.invalid .fmsg{display:block}
 .policy-grid{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}
@@ -375,7 +415,7 @@ setTimeout(function(){
 
 
 const CONFIG = {
-  VERSION: '3.5',
+  VERSION: '3.7',
   API_URL: 'https:\x2F\x2Fscript.google.com/macros/s/AKfycbzkYXiwgENHM9WlCBCsuYkMDK347diwDi_aJPLrPHy7zTFO6OERgpIRVf3OrngYUwdDuw/exec',
   CLIENT_ID: '839186324818-8il0q3v9im62jn2vho8p89s227nb245g.apps.googleusercontent.com',
   GITHUB_URL: 'https:\x2F\x2Fictsru.github.io/NetPulse/',
@@ -421,7 +461,7 @@ function toast(msg){ const t=document.createElement('div'); t.className='toast';
 function dur(ms){ if(!(ms>0)) return '—'; const m=Math.round(ms/60000); if(m<60) return m+' دقيقة'; const h=(m/60); return h<48? h.toFixed(1)+' ساعة' : (h/24).toFixed(1)+' يوم'; }
 function median(a){ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }
 function localInput(d=new Date()){ const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
-const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي فقط (@sr.edu.sa أو @srcolleges.org).',BAD_MOBILE:'رقم الجوال غير صحيح. استخدم الصيغة 05XXXXXXXX.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.',BAD_ANSWER:'إجابة غير صالحة.',BAD_EMAIL:'اكتب بريدك الجامعي كاملًا، مثل name@srcolleges.org',OTP_WRONG:'الرمز غير صحيح، تأكد منه وحاول مرة أخرى.',OTP_EXPIRED:'انتهت صلاحية الرمز أو تجاوزت عدد المحاولات — اطلب رمزًا جديدًا.',OTP_TOO_MANY:'طلبت رموزًا كثيرة خلال ساعة — حاول لاحقًا.'};
+const ERR_AR = {AUTH_DOMAIN:'يُسمح بالدخول بالبريد الجامعي فقط (@sr.edu.sa أو @srcolleges.org).',BAD_MOBILE:'رقم الجوال غير صحيح. استخدم الصيغة 05XXXXXXXX.',AUTH_INVALID:'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجددًا.',AUTH_REQUIRED:'يرجى تسجيل الدخول.',AUTH_AUDIENCE:'إعداد معرّف التطبيق غير مطابق في الخادم.',FORBIDDEN:'لا تملك صلاحية لهذا الإجراء.',MISSING_FIELDS:'يرجى تعبئة الحقول المطلوبة.',NOT_FOUND:'لم يُعثر على السجل.',BAD_ANSWER:'إجابة غير صالحة.',BAD_EMAIL:'اكتب بريدك الجامعي كاملًا، مثل name@srcolleges.org',OTP_WRONG:'الرمز غير صحيح، تأكد منه وحاول مرة أخرى.',OTP_EXPIRED:'انتهت صلاحية الرمز أو تجاوزت عدد المحاولات — اطلب رمزًا جديدًا.',OTP_TOO_MANY:'طلبت رموزًا كثيرة خلال ساعة — حاول لاحقًا.',ATTACH_COUNT:'يمكن إرفاق 3 ملفات كحد أقصى.',ATTACH_TYPE:'نوع ملف غير مدعوم — المسموح: صور، PDF، نص، Word، Excel.',ATTACH_SIZE:'حجم المرفقات كبير — 5 ميجابايت لكل ملف و10 ميجابايت للمجموع.'};
 const LOG_AR = {created:'إنشاء البلاغ',updated:'تحديث',confirmed:'أكّد المستخدم الحل',reopened:'أُعيد فتح البلاغ','auto-closed':'إغلاق تلقائي'};
 const FB_AR = {yes:['حُلّت ✓','c-ok'],no:['لم تُحل ✗','c-bad'],none:['بدون رد','c-grey']};
 
@@ -700,15 +740,53 @@ function statusBlock(b){
 }
 
 
+const DASH='—';
+function fmtMs(v){ return (v===null||v===undefined||v===DASH||isNaN(v))?DASH:Math.round(v); }
+function sparkSVG(arr){
+  if(!arr||arr.length<2) return '';
+  const max=Math.max(...arr,1), w=200, hh=38;
+  const pts=arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${(hh-2-(v/max)*(hh-6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
 function metricsHTML(t){
-  return `<div class="metric m-down"><div class="ic"><i data-lucide="arrow-down"></i></div><div><b class="en">${t.download} Mbps</b><small>سرعة التحميل</small></div></div>
-    <div class="metric m-up"><div class="ic"><i data-lucide="arrow-up"></i></div><div><b class="en">${t.upload} Mbps</b><small>سرعة الرفع</small></div></div>
-    <div class="metric m-ping"><div class="ic"><i data-lucide="activity"></i></div><div><b class="en">${t.ping} ms</b><small>زمن الاستجابة (Ping) — التذبذب <span class="en">${t.jitter} ms</span></small></div></div>`;
+  return `<div class="metric m-down"><div class="ic"><i data-lucide="arrow-down"></i></div><div><b class="en">${t.download} Mbps</b><small>سرعة التحميل</small></div>${sparkSVG(t.downSeries)}</div>
+    <div class="metric m-up"><div class="ic"><i data-lucide="arrow-up"></i></div><div><b class="en">${t.upload} Mbps</b><small>سرعة الرفع</small></div>${sparkSVG(t.upSeries)}</div>`;
+}
+function lvl(v,good,ok){ if(v===null||v===undefined||isNaN(v)) return ''; return v<=good?'lvl-ok':v<=ok?'lvl-warn':'lvl-bad'; }
+function detailHTML(t){
+  const loss = (t.loss===null||t.loss===undefined)?DASH:t.loss;
+  const srv = t.colo ? `${esc(t.city||'')}${t.city?' · ':''}${esc(t.colo)}` : DASH;
+  return `<div class="st-grid">
+    <div class="st-tile ${lvl(t.ping,60,120)}"><div class="k"><i data-lucide="timer"></i>زمن الاستجابة <span class="en">(Latency)</span></div>
+      <div class="v en">${fmtMs(t.ping)} <small>ms</small></div>
+      <div class="s">أثناء التحميل: <b class="en">${fmtMs(t.loadedDown)} ms</b><br>أثناء الرفع: <b class="en">${fmtMs(t.loadedUp)} ms</b></div></div>
+    <div class="st-tile ${lvl(t.jitter,20,40)}"><div class="k"><i data-lucide="activity"></i>التذبذب <span class="en">(Jitter)</span></div>
+      <div class="v en">${fmtMs(t.jitter)} <small>ms</small></div>
+      <div class="s">مدى تفاوت زمن الاستجابة بين الحزم — الأقل أفضل</div></div>
+    <div class="st-tile ${lvl(t.loss===DASH?NaN:t.loss,0.5,2)}"><div class="k"><i data-lucide="package-x"></i>فقد الحزم <span class="en">(Packet Loss)</span></div>
+      <div class="v en">${loss}${loss===DASH?'':' <small>%</small>'}</div>
+      <div class="s">${t.lossSent?`<span class="en">${t.lossSent-t.lossFail}/${t.lossSent}</span> طلبًا وصل — قياس تقديري`:'نسبة الطلبات التي لم تصل'}</div></div>
+    <div class="st-tile"><div class="k"><i data-lucide="server"></i>خادم القياس</div>
+      <div class="v en" style="font-size:18px">${srv}</div>
+      <div class="s">${t.isp?`مزوّد الخدمة: <b class="en">${esc(t.isp)}</b><br>`:''}${t.ip?`عنوان IP: <span class="en">${esc(t.ip)}</span>`:'Cloudflare'}</div></div>
+  </div>
+  <div class="st-sec"><i data-lucide="sparkles"></i>تقييم جودة الشبكة</div>
+  <div class="qscore">${qualityScores(t).map(q=>`<div class="qs ${q[2]}"><div class="ic"><i data-lucide="${q[1]}"></i></div><div><b>${q[0]}</b><span>${q[3]}</span></div></div>`).join('')}</div>`;
+}
+function qualityScores(t){
+  const n=x=>typeof x==='number'&&!isNaN(x);
+  if(!n(t.download)) return [['بث الفيديو','tv','q-na','—'],['الألعاب الإلكترونية','gamepad-2','q-na','—'],['مكالمات الفيديو','video','q-na','—']];
+  const loss=n(t.loss)?t.loss:0, ld=n(t.loadedDown)?t.loadedDown:t.ping;
+  const G=['q-ok','جيد'], O=['q-warn','مقبول'], P=['q-bad','ضعيف'];
+  const stream = (t.download>=25 && ld<200 && loss<2)?G : (t.download>=8 && loss<5)?O : P;
+  const game   = (t.ping<50 && t.jitter<20 && loss<1)?G : (t.ping<100 && t.jitter<40 && loss<3)?O : P;
+  const video  = (t.download>=5 && t.upload>=3 && t.ping<80 && t.jitter<30 && loss<1)?G : (t.download>=2 && t.upload>=1 && t.ping<150 && t.jitter<50 && loss<3)?O : P;
+  return [['بث الفيديو','tv',...stream],['الألعاب الإلكترونية','gamepad-2',...game],['مكالمات الفيديو','video',...video]];
 }
 function vSpeed(){
-  const t = S.lastTest || {download:'—',upload:'—',ping:'—',jitter:'—'};
+  const t = S.lastTest || {download:DASH,upload:DASH,ping:DASH,jitter:DASH};
   $('#main').innerHTML = `
-    ${head('gauge','قياس جودة الإنترنت','اختبر سرعة الإنترنت في موقعك الحالي — يستغرق القياس نحو 20 ثانية.')}
+    ${head('gauge','قياس جودة الإنترنت','اختبر سرعة الإنترنت في موقعك الحالي — يستغرق القياس نحو 30 ثانية.')}
     <div class="card">
       <div class="row" style="margin-bottom:14px">
         <div style="min-width:240px;flex:1"><label class="f">المبنى الحالي</label><select id="sb" onchange="setMyBuilding(this.value)">${buildingOptions(myBuilding())}</select></div>
@@ -722,76 +800,125 @@ function vSpeed(){
             <text x="30" y="168" font-size="10" fill="#6b5a80" text-anchor="middle">0</text>
             <text id="gmax" x="170" y="168" font-size="10" fill="#6b5a80" text-anchor="middle">100</text>
           </svg>
-          <div class="val"><span class="phase" id="gphase">جاهز للقياس</span><b id="gval" class="en">0</b><span>Mbps</span></div>
+          <div class="val"><span class="phase" id="gphase">جاهز للقياس</span><b id="gval" class="en">0</b><span id="gunit">Mbps</span></div>
         </div>
         <div id="smetrics">${metricsHTML(t)}</div>
       </div>
-      <div id="sresult"></div>
+      <div id="sdetail">${detailHTML(t)}</div>
+      <div id="sresult" style="margin-top:14px"></div>
       <div class="row" style="margin-top:12px">
         <button class="btn" id="sgo" onclick="runSpeedTest()" style="flex:1"><i data-lucide="refresh-cw"></i>${S.lastTest?'إعادة القياس':'ابدأ القياس'}</button>
         <button class="btn sec ${S.lastTest?'':'hidden'}" id="srep" onclick="reportFromTest()"><i data-lucide="send"></i>الإبلاغ بهذه النتيجة</button>
       </div>
-      <p class="hint" style="margin-top:12px">يتم القياس عبر خادم <span class="en">Cloudflare</span> الأقرب لموقعك ويعكس جودة الوصول للإنترنت من جهازك؛ قد تؤثر قوة إشارة Wi-Fi وحالة الجهاز على النتيجة.</p>
+      <p class="hint" style="margin-top:12px">يتم القياس عبر خادم <span class="en">Cloudflare</span> الأقرب لموقعك ويعكس جودة الوصول للإنترنت من جهازك؛ قد تؤثر قوة إشارة Wi-Fi وحالة الجهاز على النتيجة. «فقد الحزم» تقدير مبني على نسبة الطلبات التي لم تصل خلال ثانيتين.</p>
     </div>`;
   if (S.lastTest) showVerdict(S.lastTest);
+  icons();
 }
-function setGauge(mbps, phase){
-  const max = mbps>500?1000: mbps>250?500 : mbps>100?250:100;
+function setGauge(v, phase, unit){
+  unit = unit || 'Mbps';
+  const max = unit==='ms' ? (v>500?1000:v>200?500:200) : (v>500?1000: v>250?500 : v>100?250:100);
   $('#gmax') && ($('#gmax').textContent=max);
-  const pct = Math.min(100, (mbps/max)*100);
+  const pct = Math.min(100, (v/max)*100);
   const arc = $('#garc'); if (arc) arc.setAttribute('stroke-dasharray', `${pct} 100`);
-  if ($('#gval')) $('#gval').textContent = mbps>=100? Math.round(mbps) : (Math.round(mbps*10)/10);
+  if ($('#gval')) $('#gval').textContent = (v>=100||unit==='ms')? Math.round(v) : (Math.round(v*10)/10);
+  if ($('#gunit')) $('#gunit').textContent = unit;
   if (phase && $('#gphase')) $('#gphase').textContent = phase;
 }
 function verdict(t){
-  if (t.download>=25 && t.ping<60) return ['ممتازة','c-ok','check-circle-2'];
-  if (t.download>=10 && t.ping<120) return ['مستقرة','c-ok','check-circle-2'];
-  if (t.download>=3) return ['مستقرة مع ملاحظة بطء','c-warn','alert-triangle'];
+  const loss = typeof t.loss==='number' ? t.loss : 0;
+  if (t.download>=25 && t.ping<60 && loss<1) return ['ممتازة','c-ok','check-circle-2'];
+  if (t.download>=10 && t.ping<120 && loss<2) return ['مستقرة','c-ok','check-circle-2'];
+  if (t.download>=3 && loss<5) return ['مستقرة مع ملاحظة بطء','c-warn','alert-triangle'];
   return ['ضعيفة — يُنصح بالإبلاغ','c-bad','alert-octagon'];
 }
 function showVerdict(t){ const v=verdict(t); $('#sresult').innerHTML = `<div class="alert ${v[1]}"><i data-lucide="${v[2]}"></i>الحالة: ${v[0]}</div>`; icons(); }
 
+
+async function probe(base, timeoutMs){
+  const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), timeoutMs||2000);
+  try{
+    const t0=performance.now();
+    const r=await fetch(`${base}/__down?bytes=0&r=${Math.random()}`,{cache:'no-store',signal:ctl.signal});
+    await r.arrayBuffer();
+    let ms=performance.now()-t0;
+    const st=r.headers.get('server-timing'); const m=st && /dur=([\d.]+)/.exec(st);
+    if (m) ms=Math.max(1, ms-parseFloat(m[1]));
+    return ms;
+  } finally { clearTimeout(tm); }
+}
+function jitterOf(a){ return a.length<2?0:a.slice(1).reduce((s,p,i)=>s+Math.abs(p-a[i]),0)/(a.length-1); }
+
+function loadedProbe(base){
+  const out=[]; let on=true;
+  (async()=>{ while(on){ try{ out.push(await probe(base,3000)); }catch(e){} await new Promise(r=>setTimeout(r,250)); } })();
+  return { stop(){ on=false; return out; } };
+}
+
 async function runSpeedTest(){
   const btn=$('#sgo'); btn.disabled=true; $('#srep').classList.add('hidden'); $('#sresult').innerHTML='';
   const base = CONFIG.SPEED_SERVER;
+  const t = {download:DASH,upload:DASH,ping:DASH,jitter:DASH};
+  const paint=()=>{ $('#smetrics').innerHTML=metricsHTML(t); $('#sdetail').innerHTML=detailHTML(t); icons(); };
+  paint();
   try {
     
-    setGauge(0,'قياس زمن الاستجابة…');
-    const pings=[];
-    for (let i=0;i<10;i++){ const t0=performance.now(); await fetch(`${base}/__down?bytes=0&r=${Math.random()}`,{cache:'no-store'}); pings.push(performance.now()-t0); }
-    pings.shift();
-    const ping = Math.round(median(pings));
-    const jitter = Math.round(pings.slice(1).reduce((s,p,i)=>s+Math.abs(p-pings[i]),0)/(pings.length-1));
+    try { const m = await (await fetch(`${base}/meta`,{cache:'no-store'})).json();
+      t.colo=m.colo||''; t.city=m.city||''; t.isp=m.asOrganization||''; t.ip=m.clientIp||''; } catch(e){}
 
     
-    const downSamples=[]; const sizes=[1e5,1e6,5e6,10e6,25e6,25e6]; const dStart=performance.now();
+    const pings=[];
+    for (let i=0;i<21;i++){ const ms=await probe(base,2000); if(i) { pings.push(ms); setGauge(ms,'قياس زمن الاستجابة…','ms'); } }
+    t.ping = Math.round(median(pings)); t.jitter = Math.round(jitterOf(pings)); t.pingSeries=pings.map(x=>Math.round(x));
+    paint();
+
+    
+    setGauge(0,'قياس فقد الحزم…','%');
+    let fail=0, sent=0; const N=40;
+    const worker=async()=>{ while(sent<N){ sent++; try{ await probe(base,2000); }catch(e){ fail++; } setGauge(fail/sent*100,'قياس فقد الحزم…','%'); } };
+    await Promise.all(Array.from({length:8},worker));
+    t.lossSent=N; t.lossFail=fail; t.loss=+(fail/N*100).toFixed(1);
+    paint();
+
+    
+    const downSamples=[], downSeries=[]; const sizes=[1e5,1e6,5e6,10e6,25e6,25e6,50e6]; const dStart=performance.now();
+    let lp = loadedProbe(base), lastTick=0;
     for (const bytes of sizes){
       const t0=performance.now(); const r=await fetch(`${base}/__down?bytes=${bytes}&r=${Math.random()}`,{cache:'no-store'});
       const reader=r.body.getReader(); let got=0;
-      for(;;){ const {done,value}=await reader.read(); if(done) break; got+=value.length; const el=(performance.now()-t0)/1000; if(el>0.05) setGauge(got*8/el/1e6,'قياس سرعة التحميل…'); }
+      for(;;){ const {done,value}=await reader.read(); if(done) break; got+=value.length;
+        const now=performance.now(), el=(now-t0)/1000;
+        if(el>0.05){ const v=got*8/el/1e6; setGauge(v,'قياس سرعة التحميل…');
+          if(now-lastTick>200){ lastTick=now; downSeries.push(+v.toFixed(1)); t.downSeries=downSeries; t.download=+v.toFixed(1); $('#smetrics').innerHTML=metricsHTML(t); icons(); } } }
       const sec=(performance.now()-t0)/1000; if(bytes>=1e6) downSamples.push(got*8/sec/1e6);
-      if (performance.now()-dStart>10000) break;
+      if (performance.now()-dStart>12000) break;
     }
-    const download = +(topAvg(downSamples)).toFixed(1);
-    setGauge(download,'قياس سرعة الرفع…');
+    let lat=lp.stop(); t.loadedDown = lat.length?Math.round(median(lat)):null;
+    t.download = +(topAvg(downSamples)).toFixed(1);
+    paint();
 
     
-    const upSamples=[]; const uStart=performance.now();
-    for (const bytes of [1e5,1e6,2e6,5e6,5e6]){
+    const upSamples=[], upSeries=[]; const uStart=performance.now();
+    lp = loadedProbe(base);
+    for (const bytes of [1e5,1e6,2e6,5e6,5e6,10e6]){
       const blob=new Blob([new Uint8Array(bytes)]); const t0=performance.now();
       await fetch(`${base}/__up?r=${Math.random()}`,{method:'POST',body:blob,cache:'no-store'});
       const sec=(performance.now()-t0)/1000; const mbps=bytes*8/sec/1e6; if(bytes>=1e6) upSamples.push(mbps);
-      setGauge(mbps,'قياس سرعة الرفع…');
-      if (performance.now()-uStart>8000) break;
+      upSeries.push(+mbps.toFixed(1)); t.upSeries=upSeries; t.upload=+mbps.toFixed(1);
+      setGauge(mbps,'قياس سرعة الرفع…'); $('#smetrics').innerHTML=metricsHTML(t); icons();
+      if (performance.now()-uStart>10000) break;
     }
-    const upload = +(topAvg(upSamples)).toFixed(1);
+    lat=lp.stop(); t.loadedUp = lat.length?Math.round(median(lat)):null;
+    t.upload = +(topAvg(upSamples)).toFixed(1);
 
     const conn = (navigator.connection && navigator.connection.effectiveType) || '';
-    S.lastTest = { download, upload, ping, jitter, at:new Date().toISOString(), building: $('#sb').value, connection: $('#sc').value + (conn?` (${conn})`:'') };
-    setGauge(download,'اكتمل القياس');
-    $('#smetrics').innerHTML = metricsHTML(S.lastTest); showVerdict(S.lastTest);
+    Object.assign(t,{ at:new Date().toISOString(), building: $('#sb').value, connection: $('#sc').value + (conn?` (${conn})`:'') });
+    S.lastTest = t;
+    setGauge(t.download,'اكتمل القياس');
+    paint(); showVerdict(t);
     $('#srep').classList.remove('hidden');
-    api('saveSpeedTest',{data:{...S.lastTest, server:'speed.cloudflare.com', client:navigator.userAgent.slice(0,180)}}).catch(()=>{});
+    api('saveSpeedTest',{data:{download:t.download, upload:t.upload, ping:t.ping, jitter:t.jitter, loss:t.loss, loadedDown:t.loadedDown, loadedUp:t.loadedUp,
+      colo:t.colo, isp:t.isp, building:t.building, connection:t.connection, server:'speed.cloudflare.com', client:navigator.userAgent.slice(0,180)}}).catch(()=>{});
   } catch(e){
     setGauge(0,'تعذّر القياس');
     $('#sresult').innerHTML = `<div class="alert c-bad"><i data-lucide="wifi-off"></i>تعذّر الوصول إلى خادم القياس. تحقق من اتصالك بالشبكة ثم أعد المحاولة، أو أبلغ عن المشكلة مباشرة.</div>`;
@@ -829,8 +956,15 @@ function vReport(){
         <div class="field"><label class="f" for="rx">وصف المشكلة <span class="hint">(اختياري)</span></label>
           <textarea id="rx" maxlength="500" placeholder="صف المشكلة بإيجاز: متى بدأت، هل تتكرر، الأنظمة المتأثرة…" oninput="$('#rcnt').textContent=this.value.length+'/500'"></textarea>
           <div class="hint en" id="rcnt">0/500</div></div>
+        <div class="field"><label class="f">المرفقات <span class="hint">(اختياري — صور أو ملفات، حتى 3 ملفات)</span></label>
+          <input type="file" id="rfile" multiple accept="image/*,.pdf,.txt,.log,.docx,.xlsx" class="hidden" onchange="addFiles(this.files);this.value=''">
+          <div class="dropzone" id="rdrop" tabindex="0" role="button" onclick="$('#rfile').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();$('#rfile').click()}">
+            <i data-lucide="paperclip"></i><b>اختر ملفًا</b> أو اسحبه هنا — يمكنك أيضًا لصق لقطة شاشة <span class="en">(Ctrl+V)</span>
+            <div class="hint" style="margin-top:2px">صور، <span class="en">PDF</span>، نص، <span class="en">Word</span>، <span class="en">Excel</span> — حتى <span class="en">5 MB</span> للملف (تُضغط الصور تلقائيًا)</div>
+          </div>
+          <div class="att-list" id="ratt"></div></div>
         <div class="hint" style="margin-bottom:10px"><span class="star">*</span> حقل مطلوب</div>
-        <label class="row hint" style="margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="ra" ${S.lastTest?'checked':'disabled'}> إرفاق نتيجة آخر قياس ${S.lastTest?`(<span class="en">${S.lastTest.download} / ${S.lastTest.upload} Mbps — ${S.lastTest.ping} ms</span>)`:'(لا يوجد قياس — يُنصح بإجراء قياس أولًا)'}</label>
+        <label class="row hint" style="margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="ra" ${S.lastTest?'checked':'disabled'}> إرفاق نتيجة آخر قياس ${S.lastTest?`(<span class="en">${S.lastTest.download} / ${S.lastTest.upload} Mbps — ${S.lastTest.ping} ms${typeof S.lastTest.loss==='number'?' — loss '+S.lastTest.loss+'%':''}</span>)`:'(لا يوجد قياس — يُنصح بإجراء قياس أولًا)'}</label>
         <button class="btn block" id="rsend"><i data-lucide="send"></i>إرسال البلاغ</button>
       </form>
       <div id="rside" class="card">
@@ -846,6 +980,7 @@ function vReport(){
       </div>
     </div>`;
   if (dept && [...$('#rd').options].some(o=>o.value===dept)) $('#rd').value = dept;
+  S.files = []; initDropzone();
   
   document.querySelectorAll('#rform .field.req select, #rform .field.req input').forEach(el =>
     ['input','change'].forEach(evt => el.addEventListener(evt, () => { if (fieldOk(el)) el.closest('.field').classList.remove('invalid'); })));
@@ -866,13 +1001,75 @@ function validateReport(){
   if(first){ first.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>first.focus({preventScroll:true}),350); }
   return !first;
 }
+
+const ATT_MAX_FILES=3, ATT_MAX_BYTES=5*1024*1024, ATT_MAX_TOTAL=10*1024*1024;
+const ATT_TYPES={'image/jpeg':1,'image/png':1,'image/webp':1,'image/gif':1,'image/heic':1,'image/heif':1,'application/pdf':1,'text/plain':1,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':1,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':1};
+function fileType(f){
+  const e=((f.name||'').split('.').pop()||'').toLowerCase();
+  if (e==='log'||e==='txt'||/^text\x2F/.test(f.type||'')) return 'text/plain';
+  if (f.type) return f.type==='image/jpg'?'image/jpeg':f.type;
+  return {log:'text/plain',txt:'text/plain',pdf:'application/pdf',heic:'image/heic',heif:'image/heif',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}[e]||'';
+}
+function fmtSize(b){ return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+function readAsDataURL(blob){ return new Promise((ok,no)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=no; r.readAsDataURL(blob); }); }
+
+async function shrinkImage(file, type){
+  if (!/^image\x2F(jpeg|png|webp)$/.test(type)) return null;
+  try{
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600/Math.max(bmp.width,bmp.height));
+    if (k===1 && file.size<600*1024) return null;
+    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(bmp,0,0,c.width,c.height);
+    const out = await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
+    return out && out.size<file.size ? out : null;
+  }catch(e){ return null; }
+}
+async function addFiles(list){
+  for (const f of Array.from(list||[])){
+    if (S.files.length>=ATT_MAX_FILES){ toast(ERR_AR.ATTACH_COUNT); break; }
+    const type=fileType(f);
+    if (!ATT_TYPES[type]){ toast('«'+f.name+'»: '+ERR_AR.ATTACH_TYPE); continue; }
+    let blob=f, name=f.name||'screenshot.png';
+    const small = await shrinkImage(f,type);
+    let t=type; if (small){ blob=small; t='image/jpeg'; name=name.replace(/\.(png|webp|jpe?g)$/i,'')+'.jpg'; }
+    if (blob.size>ATT_MAX_BYTES){ toast('«'+name+'»: '+ERR_AR.ATTACH_SIZE); continue; }
+    if (S.files.reduce((s,x)=>s+x.size,0)+blob.size>ATT_MAX_TOTAL){ toast(ERR_AR.ATTACH_SIZE); break; }
+    const data = await readAsDataURL(blob);
+    S.files.push({name, type:t, size:blob.size, data, preview: t.startsWith('image/') && !/hei[cf]/.test(t) ? data : ''});
+  }
+  renderFiles();
+}
+function fileIcon(t){ return t.startsWith('image/')?'image':t==='application/pdf'?'file-text':t.includes('sheet')?'file-spreadsheet':'file'; }
+function renderFiles(){
+  const el=$('#ratt'); if(!el) return;
+  el.innerHTML = S.files.map((f,i)=>`<div class="att"><div class="th">${f.preview?`<img src="${f.preview}" alt="">`:`<i data-lucide="${fileIcon(f.type)}"></i>`}</div>
+    <div style="min-width:0"><div class="nm" title="${esc(f.name)}">${esc(f.name)}</div><div class="sz en">${fmtSize(f.size)}</div></div>
+    <button type="button" title="إزالة" onclick="S.files.splice(${i},1);renderFiles()"><i data-lucide="x"></i></button></div>`).join('');
+  $('#rdrop').style.display = S.files.length>=ATT_MAX_FILES ? 'none' : '';
+  icons();
+}
+function initDropzone(){
+  const z=$('#rdrop'); if(!z) return;
+  ['dragenter','dragover'].forEach(e=>z.addEventListener(e,ev=>{ev.preventDefault();z.classList.add('over');}));
+  ['dragleave','drop'].forEach(e=>z.addEventListener(e,ev=>{ev.preventDefault();z.classList.remove('over');}));
+  z.addEventListener('drop',ev=>addFiles(ev.dataTransfer.files));
+  $('#rform').addEventListener('paste',ev=>{ const fs=[...(ev.clipboardData&&ev.clipboardData.files||[])]; if(fs.length){ ev.preventDefault(); addFiles(fs); } });
+}
+function attachmentsHTML(list){
+  if(!list||!list.length) return '';
+  return `<span>المرفقات</span><div class="att-list" style="margin-top:0">${list.map(a=>`<a class="att" href="${esc(a.url||'#')}" target="_blank" rel="noopener"><div class="th"><i data-lucide="${fileIcon(a.type||'')}"></i></div><div style="min-width:0"><div class="nm" title="${esc(a.name)}">${esc(a.name)}</div><div class="sz en">${fmtSize(a.size||0)}</div></div></a>`).join('')}</div>`;
+}
+
 async function submitReport(ev){
   ev.preventDefault();
   if (!validateReport()) return;
-  const b=$('#rsend'); b.disabled=true; b.innerHTML='جارٍ الإرسال…';
+  const b=$('#rsend'); b.disabled=true; b.innerHTML=(S.files&&S.files.length)?'جارٍ رفع المرفقات والإرسال…':'جارٍ الإرسال…';
   const data = { department:$('#rd').value, issueType:$('#rt').value, building:$('#rb').value, spot:$('#rs').value.trim(),
     occurredAt: $('#ro').value ? new Date($('#ro').value).toISOString() : '', connection:$('#rc').value,
-    description:$('#rx').value.trim(), mobile:$('#rm').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping} : null };
+    description:$('#rx').value.trim(), mobile:$('#rm').value.trim(), test: $('#ra').checked && S.lastTest ? {download:S.lastTest.download,upload:S.lastTest.upload,ping:S.lastTest.ping,jitter:S.lastTest.jitter,loss:S.lastTest.loss} : null,
+    attachments: (S.files||[]).map(f=>({name:f.name,type:f.type,data:f.data})) };
   try {
     try{ localStorage.setItem('np_dept', data.department); }catch(e){}
     setMyBuilding(data.building);
@@ -880,7 +1077,7 @@ async function submitReport(ev){
     if (!S.user.mobile) S.user.mobile = data.mobile;
     S.tickets = (await api('myTickets')).tickets;
     $('#rside').outerHTML = `<div class="success" id="rside"><div class="big"><i data-lucide="check"></i></div><h3 style="justify-content:center;color:var(--ok)">تم استلام البلاغ</h3><div class="hint">وتم تحويله إلى الفريق الفني</div><div class="hint" style="margin-top:10px">رقم البلاغ:</div><div class="tno en">${esc(out.ticketId)}</div><div class="hint">${fmtDT(new Date().toISOString())}</div><button class="btn sec" style="margin-top:12px" onclick="openTicket('${esc(out.ticketId)}')">متابعة البلاغ</button></div>`;
-    $('#rform').reset(); $('#ro').value=localInput(); $('#rcnt').textContent='0/500';
+    $('#rform').reset(); $('#ro').value=localInput(); $('#rcnt').textContent='0/500'; S.files=[]; renderFiles();
     toast('تم إرسال البلاغ '+out.ticketId);
   } catch(e){ toast(e.message); }
   b.disabled=false; b.innerHTML='<i data-lucide="send"></i>إرسال البلاغ'; icons();
@@ -919,7 +1116,8 @@ async function openTicket(id){
         <span>وقت المشكلة</span><div>${fmtDT(t.occurredAt)}</div>
         <span>وقت البلاغ</span><div>${fmtDT(t.createdAt)}</div>
         <span>الوصف</span><div>${esc(t.description||'—')}</div>
-        ${t.test?`<span>القياس المرفق</span><div class="en">↓ ${t.test.download} · ↑ ${t.test.upload} Mbps · ${t.test.ping} ms</div>`:''}
+        ${t.test?`<span>القياس المرفق</span><div class="en">↓ ${t.test.download} · ↑ ${t.test.upload} Mbps · ${t.test.ping} ms${t.test.jitter!=null&&t.test.jitter!==''?' · jitter '+t.test.jitter+' ms':''}${t.test.loss!=null&&t.test.loss!==''?' · loss '+t.test.loss+'%':''}</div>`:''}
+        ${attachmentsHTML(t.attachments)}
         ${t.assignee?`<span>المسؤول</span><div>${esc(t.assignee)}</div>`:''}
         ${t.resolution?`<span>الحل</span><div>${esc(t.resolution)}</div>`:''}
       </div>
@@ -1177,7 +1375,7 @@ async function demoApi(action,p){
     case 'createTicket': { const d=p.data; if(!d.building||!d.issueType||!d.department) throw new Error(ERR_AR.MISSING_FIELDS);
       const id='NP-'+(++db.seq); const now=new Date().toISOString();
       if(!mobileOk(d.mobile)) throw new Error(ERR_AR.BAD_MOBILE); if(!db.mobile) db.mobile=demoNorm(d.mobile);
-      db.tickets.unshift({id,mobile:demoNorm(d.mobile),createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test});
+      db.tickets.unshift({id,mobile:demoNorm(d.mobile),createdAt:now,email:u.email,name:u.name,department:d.department,building:d.building,spot:d.spot,issueType:d.issueType,connection:d.connection,occurredAt:d.occurredAt||now,description:d.description,status:'open',priority:d.issueType==='انقطاع كامل'?'high':'medium',assignee:'',firstResponseAt:'',resolvedAt:'',updatedAt:now,resolution:'',test:d.test,attachments:(d.attachments||[]).map(a=>({name:a.name,type:a.type,size:Math.round(a.data.length*0.75),url:a.data}))});
       db.log.push({at:now,ticketId:id,action:'created',status:'open',note:'',by:u.email}); demoSave(db); return {ok:true,ticketId:id}; }
     case 'myTickets': return {ok:true,tickets:mine()};
     case 'getTicket': { const t=db.tickets.find(x=>x.id===p.ticketId); if(!t) throw new Error(ERR_AR.NOT_FOUND); return {ok:true,ticket:t,log:db.log.filter(l=>l.ticketId===t.id)}; }
@@ -1548,7 +1746,7 @@ NP_LOGOS['sru_logo'] = [
     });
   } catch (e) { console.warn('logo load failed', e); }
 })();
-window.NP_END = '3.5';   
+window.NP_END = '3.7';   
 </script>
 </body>
 </html>
